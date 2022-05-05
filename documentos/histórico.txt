@@ -1,9 +1,0 @@
-02/05 
-  2,5 horas
-  projetar e desenhar o projeto
-03/05  
-  3 horas
-  criação do layout da tela de login
-  início do desenvolvimento de funções com setstate
-
-05/05 
