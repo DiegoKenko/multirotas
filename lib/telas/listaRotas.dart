@@ -11,80 +11,16 @@ class _ListaRotasState extends State<ListaRotas> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          verticalDirection: VerticalDirection.down,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: const Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: const Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-          ],
+        body: Container(
+      padding: EdgeInsets.only(top: 70, left: 20, right: 20),
+      child: const TextField(
+        decoration: InputDecoration(
+          hintText: 'Destino...',
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.black),
+          ),
         ),
       ),
-    );
+    ));
   }
 }
