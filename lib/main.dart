@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'principal.dart';
 
 void main() {
   runApp(const MyApp());
@@ -30,8 +31,11 @@ class MyHomePage extends StatefulWidget {
 
 class MyHomePageState extends State<MyHomePage> {
   bool erro = true;
+
   mudaErro() {
-    setState(() {});
+    setState(() {
+      erro = !erro;
+    });
   }
 
   @override
@@ -80,30 +84,9 @@ class MyHomePageState extends State<MyHomePage> {
             ElevatedButton(
               child: const Text('teste'),
               onPressed: () {
-                showModalBottomSheet<void>(
-                  context: context,
-                  builder: (BuildContext context) {
-                    return Container(
-                      height: 100,
-                      color: !erro ? Colors.red : Colors.green,
-                      child: Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            const Text('Eita, senha incorreta!'),
-                            ElevatedButton(
-                              child: const Text('Tentar novamente'),
-                              onPressed: () => {
-                                Navigator.pop(context),
-                                mudaErro(),
-                              },
-                            )
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => Principal()),
                 );
               },
             )

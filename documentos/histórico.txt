@@ -6,4 +6,10 @@
   criação do layout da tela de login
   início do desenvolvimento de funções com setstate
 
+04/04
+  instalação e configuração de programas para desenvolvimento
+
 05/05 
+  instalação e configuração de programas para desenvolvimento 
+  criação da tela principal
+
