@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:multirotas/telas/mapa.dart';
 import 'listaRotas.dart';
 
 class Principal extends StatefulWidget {
@@ -18,7 +19,12 @@ class _PrincipalState extends State<Principal> {
           children: [
             SizedBox(
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => TelaMapa()),
+                  );
+                },
                 child: Text("minha rota"),
               ),
               height: 80,

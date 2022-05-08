@@ -32,7 +32,7 @@ class _ListaRotasState extends State<ListaRotas> {
               child: SizedBox(
                 child: ElevatedButton(
                   onPressed: () {},
-                  child: Text("Rota1"),
+                  child: const Text("Rota1"),
                 ),
                 height: 60,
                 width: 80,
@@ -43,7 +43,7 @@ class _ListaRotasState extends State<ListaRotas> {
               child: SizedBox(
                 child: ElevatedButton(
                   onPressed: () {},
-                  child: Text("Rota1"),
+                  child: const Text("Rota1"),
                 ),
                 height: 60,
                 width: 80,
