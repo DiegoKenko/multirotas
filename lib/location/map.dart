@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
@@ -16,6 +17,7 @@ class _MapViewState extends State<MapView> {
   CameraPosition _initialLocation =
       CameraPosition(target: LatLng(-19.4948441, -44.3076397), zoom: 15);
   late GoogleMapController mapController;
+  late PolylinePoints polylinePoints;
   final startAddressController = TextEditingController();
 
   @override
@@ -25,9 +27,8 @@ class _MapViewState extends State<MapView> {
   }
 
   _getCurrentLocation() {
-    // Atualização da localização
+    // Atualização da localização como stream.
     // É possível utilizar 'await Geolocator.getCurrentPosition'
-
     Geolocator.getPositionStream(
             desiredAccuracy: LocationAccuracy.medium,
             intervalDuration: Duration(seconds: 10))
@@ -51,12 +52,6 @@ class _MapViewState extends State<MapView> {
     var height = MediaQuery.of(context).size.height;
     var width = MediaQuery.of(context).size.width;
 
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return SizedBox(
       height: height,
       width: width,
@@ -64,6 +59,7 @@ class _MapViewState extends State<MapView> {
         appBar: AppBar(),
         body: Stack(children: [
           GoogleMap(
+            compassEnabled: true,
             initialCameraPosition: _initialLocation,
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
@@ -78,9 +74,9 @@ class _MapViewState extends State<MapView> {
             padding: const EdgeInsets.all(30.0),
             child: ClipOval(
               child: Material(
-                color: Colors.white, // button color
+                color: Colors.white,
                 child: InkWell(
-                  splashColor: Colors.blue, // inkwell color
+                  splashColor: Colors.blue,
                   child: const SizedBox(
                     width: 60,
                     height: 60,

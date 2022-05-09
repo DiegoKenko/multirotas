@@ -13,3 +13,8 @@
   instalação e configuração de programas para desenvolvimento 
   criação da tela principal
 
+08/05 
+  planejamento e estruturação do realtime database
+  planejamento e estruturação do app GPS - ônibus
+  criação do mapa e algumas funcionalidades iniciais
+

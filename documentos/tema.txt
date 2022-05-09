@@ -1,5 +1,5 @@
 /*
-Cores contidas no Documento de MArcaMTI
+Cores contidas no Documento de MarcaMTI
 #57C0A4
 #373D69 #F5863C
 #56C1B2 #00AFEF
