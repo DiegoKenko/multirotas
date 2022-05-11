@@ -11,5 +11,11 @@ Background process - https://docs.flutter.dev/development/packages-and-plugins/b
 Criação de serviços de background - https://www.youtube.com/watch?v=pKzFtgcZ-Wk
 
 
-RealtimeDatabase
-https://firebase.google.com/docs/database/android/start
+Atualizando Gradle
+https://stackoverflow.com/questions/66920708/update-gradle-in-flutter-project
+
+Firebase 
+https://firebase.google.com/docs/flutter/setup?platform=android
+
+     RealtimeDatabase
+     https://firebase.google.com/docs/database/android/start

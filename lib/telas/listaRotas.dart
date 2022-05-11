@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:multirotas/firebase/firestore.dart';
 
 class ListaRotas extends StatefulWidget {
-  ListaRotas({Key? key}) : super(key: key);
+  const ListaRotas({Key? key}) : super(key: key);
 
   @override
   State<ListaRotas> createState() => _ListaRotasState();
@@ -10,81 +11,12 @@ class ListaRotas extends StatefulWidget {
 class _ListaRotasState extends State<ListaRotas> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          verticalDirection: VerticalDirection.down,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: const Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: const Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: SizedBox(
-                child: ElevatedButton(
-                  onPressed: () {},
-                  child: Text("Rota1"),
-                ),
-                height: 60,
-                width: 80,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return const Scaffold(
+      body: Center(),
     );
+  }
+
+  _getTodasRotas() {
+    Firestore().todasRotas();
   }
 }

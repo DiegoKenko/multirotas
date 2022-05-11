@@ -22,10 +22,10 @@ class _PrincipalState extends State<Principal> {
                 onPressed: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (context) => TelaMapa()),
+                    MaterialPageRoute(builder: (context) => const TelaMapa()),
                   );
                 },
-                child: Text("minha rota"),
+                child: const Text("minha rota"),
               ),
               height: 80,
             ),
@@ -38,7 +38,7 @@ class _PrincipalState extends State<Principal> {
                     MaterialPageRoute(builder: (context) => ListaRotas()),
                   );
                 },
-                child: Text('buscar rota'),
+                child: const Text('buscar rota'),
               ),
             )
           ],
