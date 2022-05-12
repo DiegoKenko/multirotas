@@ -1,9 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:multirotas/class/Busao.dart';
 import 'package:multirotas/firebase/firestore.dart';
 
 class MapView extends StatefulWidget {
@@ -66,7 +66,9 @@ class _MapViewState extends State<MapView> {
                       height: 60,
                       child: Icon(Icons.my_location),
                     ),
-                    onTap: () {},
+                    onTap: () {
+                      _getCurrentLocation();
+                    },
                   ),
                 ),
               ),
@@ -86,7 +88,7 @@ class _MapViewState extends State<MapView> {
     }
     Geolocator.getPositionStream(
       desiredAccuracy: LocationAccuracy.best,
-      intervalDuration: const Duration(seconds: 3),
+      intervalDuration: const Duration(seconds: 2),
       distanceFilter: 10,
     ).listen(
       (position) {
@@ -96,6 +98,8 @@ class _MapViewState extends State<MapView> {
           CameraUpdate.newCameraPosition(
             CameraPosition(
               target: LatLng(position.latitude, position.longitude),
+              tilt: 0,
+              bearing: 0,
               zoom: 15.0,
             ),
           ),
@@ -107,11 +111,8 @@ class _MapViewState extends State<MapView> {
   // Atualização stream da localização dos ônibus
   // Os ônibus são identificados como marcadores
   void _getBusaoLocation() async {
-    Busao? x;
-    DatabaseReference dbRef =
-        FirebaseDatabase.instance.ref().child('localizacaoBusao').child('id');
-    dbRef.onValue.listen(
-      (DatabaseEvent event) {},
-    );
+    var rotas = await Firestore().todasRotas();
+    // Deve buscar as rotas e seu repectivo busao.
+    rotas.forEach((element) {});
   }
 }

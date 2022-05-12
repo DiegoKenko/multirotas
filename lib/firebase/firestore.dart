@@ -13,7 +13,11 @@ class Firestore {
   }
 
   Future<List<dynamic>> todasRotas() async {
+    List<Map> rotas = [];
     var x = await FirebaseFirestore.instance.collection('rotas').get();
-    return x.docs;
+    for (var element in x.docs) {
+      rotas.add(element.data());
+    }
+    return rotas;
   }
 }
