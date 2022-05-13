@@ -25,7 +25,7 @@ class _PrincipalState extends State<Principal> {
                     MaterialPageRoute(builder: (context) => const TelaMapa()),
                   );
                 },
-                child: const Text("minha rota"),
+                child: Text("Minha Rota"),
               ),
               height: 80,
             ),
@@ -38,7 +38,8 @@ class _PrincipalState extends State<Principal> {
                     MaterialPageRoute(builder: (context) => ListaRotas()),
                   );
                 },
-                child: const Text('buscar rota'),
+                child: Text('Bucar Rota'),
+
               ),
             )
           ],
