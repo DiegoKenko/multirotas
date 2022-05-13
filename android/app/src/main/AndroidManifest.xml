@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.multirotas">
-    <application android:name="${applicationName}" android:icon="@mipmap/ic_launcher">
+    <application android:name="${applicationName}" android:icon="@mipmap/launcher_icon" android:label="Multi Rotas">
 
         <meta-data android:name="com.google.android.geo.API_KEY" android:value="AIzaSyC-cAQ95icIXxAelzKYLjwVVDCw-KFmuBw" />
         <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:theme="@style/LaunchTheme" android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" android:hardwareAccelerated="true" android:windowSoftInputMode="adjustResize">
