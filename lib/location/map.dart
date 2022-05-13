@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -18,7 +16,9 @@ class _MapViewState extends State<MapView> {
       const CameraPosition(target: LatLng(-19.4948441, -44.3076397), zoom: 15);
   late GoogleMapController mapController;
   late PolylinePoints polylinePoints;
+  List<LatLng> polylineCoordinates = [];
   final startAddressController = TextEditingController();
+  Map<PolylineId, Polyline> polylines = {};
 
   Set<Marker> markers = {};
 
@@ -26,7 +26,7 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     _getCurrentLocation();
-    _getBusaoLocation();
+    //_getRotas();
   }
 
   @override
@@ -37,44 +37,67 @@ class _MapViewState extends State<MapView> {
       height: height,
       width: width,
       child: Scaffold(
-        body: Stack(children: [
-          GoogleMap(
-            markers: Set<Marker>.from(markers),
-            compassEnabled: true,
-            initialCameraPosition: _initialLocation,
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            mapType: MapType.normal,
-            zoomGesturesEnabled: true,
-            zoomControlsEnabled: false,
-            onMapCreated: (GoogleMapController controller) {
-              mapController = controller;
-            },
-          ),
-          Positioned(
-            bottom: 20,
-            right: 20,
-            child: Padding(
-              padding: const EdgeInsets.all(30.0),
-              child: ClipOval(
-                child: Material(
-                  color: Colors.white,
-                  child: InkWell(
-                    splashColor: Colors.blue,
-                    child: const SizedBox(
-                      width: 60,
-                      height: 60,
-                      child: Icon(Icons.my_location),
-                    ),
-                    onTap: () {
-                      _getCurrentLocation();
-                    },
+        body: Stack(
+          alignment: AlignmentDirectional.bottomEnd,
+          children: [
+            GoogleMap(
+              markers: Set<Marker>.from(markers),
+              compassEnabled: true,
+              polylines: Set<Polyline>.of(polylines.values),
+              initialCameraPosition: _initialLocation,
+              myLocationEnabled: true,
+              myLocationButtonEnabled: false,
+              mapType: MapType.normal,
+              zoomGesturesEnabled: true,
+              zoomControlsEnabled: false,
+              onMapCreated: (GoogleMapController controller) {
+                mapController = controller;
+              },
+            ),
+            Positioned(
+              child: Container(
+                child: Center(
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      const SizedBox(
+                        width: 220,
+                        height: 80,
+                        child: Card(
+                          color: Color(0xFF373D69),
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 220,
+                        height: 80,
+                        child: Card(
+                          color: Color(0xFF373D69),
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 220,
+                        height: 80,
+                        child: Card(
+                          color: Color(0xFF373D69),
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 220,
+                        height: 80,
+                        child: Card(
+                          color: Color(0xFF373D69),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                margin: const EdgeInsets.only(bottom: 5),
+                height: 120,
+                color: const Color(0xFF57C0A4),
               ),
             ),
-          ),
-        ]),
+          ],
+        ),
       ),
     );
   }
@@ -82,24 +105,17 @@ class _MapViewState extends State<MapView> {
   // Atualização da localização como stream.
   // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getCurrentLocation() async {
-    bool _ativo = await Geolocator.isLocationServiceEnabled();
-    if (!_ativo) {
-      await Geolocator.getCurrentPosition();
-    }
     Geolocator.getPositionStream(
-      desiredAccuracy: LocationAccuracy.best,
-      intervalDuration: const Duration(seconds: 2),
-      distanceFilter: 10,
-    ).listen(
+            desiredAccuracy: LocationAccuracy.bestForNavigation)
+        .listen(
       (position) {
         _initialLocation = CameraPosition(
-            target: LatLng(position.latitude, position.longitude));
+          target: LatLng(position.latitude, position.longitude),
+        );
         mapController.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(
               target: LatLng(position.latitude, position.longitude),
-              tilt: 0,
-              bearing: 0,
               zoom: 15.0,
             ),
           ),
@@ -108,11 +124,62 @@ class _MapViewState extends State<MapView> {
     );
   }
 
+  void _getRotas() async {
+    String id;
+    var rotas = await Firestore().todasRotas();
+    // Deve buscar as rotas e seu repectivo busao.
+    polylines = {};
+    for (int i = 0; i < rotas.length; i++) {
+      id = rotas[i]['id'];
+      for (int q = 0; q < rotas[i]['parada'].length - 1; q++) {}
+    }
+  }
+
+  _createPolylines(
+      double startLatitude,
+      double startLongitude,
+      double destinationLatitude,
+      double destinationLongitude,
+      String nomeId) async {
+    // Initializing PolylinePoints
+    polylinePoints = PolylinePoints();
+
+    // Generating the list of coordinates to be used for
+    // drawing the polylines
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      'AIzaSyC-cAQ95icIXxAelzKYLjwVVDCw-KFmuBw', // Google Maps API Key
+      PointLatLng(startLatitude, startLongitude),
+      PointLatLng(destinationLatitude, destinationLongitude),
+      travelMode: TravelMode.transit,
+    );
+
+    // Adding the coordinates to the list
+    if (result.points.isNotEmpty) {
+      for (var point in result.points) {
+        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+      }
+    }
+
+    // Defining an ID
+    PolylineId id = PolylineId(nomeId);
+
+    // Initializing Polyline
+    Polyline polyline = Polyline(
+      polylineId: id,
+      color: Colors.red,
+      points: polylineCoordinates,
+      width: 3,
+    );
+
+    // Adding the polyline to the map
+    polylines[id] = polyline;
+  }
+
   // Atualização stream da localização dos ônibus
   // Os ônibus são identificados como marcadores
   void _getBusaoLocation() async {
     var rotas = await Firestore().todasRotas();
     // Deve buscar as rotas e seu repectivo busao.
-    rotas.forEach((element) {});
+    for (var element in rotas) {}
   }
 }

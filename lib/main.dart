@@ -35,7 +35,6 @@ class TelaLogin extends StatefulWidget {
 class TelaLoginState extends State<TelaLogin> {
   @override
   Widget build(BuildContext context) {
-
     return FutureBuilder(
       future: Future.delayed(const Duration(seconds: 3)),
       builder: (context, s) {
@@ -108,7 +107,6 @@ class TelaLoginState extends State<TelaLogin> {
                       )
                     ],
                   ),
-
                 ),
               );
             },
