@@ -18,3 +18,11 @@
   planejamento e estruturaÃ§Ã£o do app GPS - Ã´nibus
   criaÃ§Ã£o do mapa e algumas funcionalidades iniciais
 
+09/05
+  modificações em telas
+  configuração do flutterfire
+
+10/05
+  adição do recebimento da localização busão(marcador) através realtimedatabase.
+  configuração do cloudfirestore
+  

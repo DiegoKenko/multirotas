@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:multirotas/firebase/firestore.dart';
 
 class ListaRotas extends StatefulWidget {
-  ListaRotas({Key? key}) : super(key: key);
+  const ListaRotas({Key? key}) : super(key: key);
 
   @override
   State<ListaRotas> createState() => _ListaRotasState();
@@ -10,17 +11,14 @@ class ListaRotas extends StatefulWidget {
 class _ListaRotasState extends State<ListaRotas> {
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-        body: Container(
-      padding: EdgeInsets.only(top: 70, left: 20, right: 20),
-      child: const TextField(
-        decoration: InputDecoration(
-          hintText: 'Destino...',
-          border: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.black),
-          ),
-        ),
-      ),
-    ));
+
+    return const Scaffold(
+      body: Center(),
+    );
+
+  }
+
+  _getTodasRotas() {
+    Firestore().todasRotas();
   }
 }

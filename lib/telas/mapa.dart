@@ -7,7 +7,11 @@ class TelaMapa extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      child: MapView(),
+      child: Column(
+        children: [
+          MapView(),
+        ],
+      ),
     );
   }
 }
