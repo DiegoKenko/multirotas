@@ -1,5 +1,3 @@
-import 'package:firebase_database/firebase_database.dart';
-
 class Busao {
   Busao(this.id, this.placa);
   String? placa;

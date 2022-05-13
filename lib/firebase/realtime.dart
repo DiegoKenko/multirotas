@@ -8,8 +8,6 @@ class Realtime {
     DatabaseReference starCountRef =
         FirebaseDatabase.instance.ref('localizacaoBusao');
 
-    starCountRef.onValue.listen((DatabaseEvent event) {
-      final data = event.snapshot.value;
-    });
+    starCountRef.onValue.listen((DatabaseEvent event) {});
   }
 }

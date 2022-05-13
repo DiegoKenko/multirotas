@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:multirotas/telas/principal.dart';
+import 'package:multirotas/telas/mapa.dart';
 import 'comp/decDegrade.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -100,7 +100,7 @@ class TelaLoginState extends State<TelaLogin> {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (context) => Principal()),
+                                  builder: (context) => const TelaMapa()),
                             );
                           },
                         ),
@@ -122,7 +122,7 @@ class TelaLoginState extends State<TelaLogin> {
                     Image.asset(
                       'lib/assets/carregamento.png',
                     ),
-                    Text(
+                    const Text(
                       'Carregando...',
                       style: TextStyle(fontSize: 22),
                     )

@@ -25,7 +25,7 @@ class _MapViewState extends State<MapView> {
   @override
   void initState() {
     super.initState();
-    _getCurrentLocation();
+    _getStremLocation();
     //_getRotas();
   }
 
@@ -59,29 +59,29 @@ class _MapViewState extends State<MapView> {
                 child: Center(
                   child: ListView(
                     scrollDirection: Axis.horizontal,
-                    children: [
-                      const SizedBox(
+                    children: const [
+                      SizedBox(
                         width: 220,
                         height: 80,
                         child: Card(
                           color: Color(0xFF373D69),
                         ),
                       ),
-                      const SizedBox(
+                      SizedBox(
                         width: 220,
                         height: 80,
                         child: Card(
                           color: Color(0xFF373D69),
                         ),
                       ),
-                      const SizedBox(
+                      SizedBox(
                         width: 220,
                         height: 80,
                         child: Card(
                           color: Color(0xFF373D69),
                         ),
                       ),
-                      const SizedBox(
+                      SizedBox(
                         width: 220,
                         height: 80,
                         child: Card(
@@ -104,10 +104,11 @@ class _MapViewState extends State<MapView> {
 
   // Atualização da localização como stream.
   // É possível utilizar 'await Geolocator.getCurrentPosition'
-  _getCurrentLocation() async {
+  _getStremLocation() async {
     Geolocator.getPositionStream(
-            desiredAccuracy: LocationAccuracy.bestForNavigation)
-        .listen(
+      desiredAccuracy: LocationAccuracy.bestForNavigation,
+      intervalDuration: const Duration(seconds: 2),
+    ).listen(
       (position) {
         _initialLocation = CameraPosition(
           target: LatLng(position.latitude, position.longitude),
@@ -122,17 +123,6 @@ class _MapViewState extends State<MapView> {
         );
       },
     );
-  }
-
-  void _getRotas() async {
-    String id;
-    var rotas = await Firestore().todasRotas();
-    // Deve buscar as rotas e seu repectivo busao.
-    polylines = {};
-    for (int i = 0; i < rotas.length; i++) {
-      id = rotas[i]['id'];
-      for (int q = 0; q < rotas[i]['parada'].length - 1; q++) {}
-    }
   }
 
   _createPolylines(
