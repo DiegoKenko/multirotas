@@ -5,12 +5,12 @@ class Rota {
   String nome;
   String busao;
   bool ida;
-  List<Object?> parada;
+  List<dynamic> parada;
 
   Rota.fromMap(Map<String, dynamic> data)
       : id = data["id"],
         busao = data["busao"],
-        ida = data["id"],
+        ida = data["ida"],
         nome = data["nome"],
         parada = data["parada"];
 }
