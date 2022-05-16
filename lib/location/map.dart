@@ -13,8 +13,8 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  CameraPosition _initialLocation =
-      const CameraPosition(target: LatLng(-19.4948441, -44.3076397), zoom: 16);
+  CameraPosition _initialLocation = const CameraPosition(
+      target: LatLng(-19.49392296505924, -44.30632263820034), zoom: 16);
   late GoogleMapController mapController;
   late PolylinePoints polylinePoints;
   final startAddressController = TextEditingController();
@@ -54,9 +54,17 @@ class _MapViewState extends State<MapView> {
                 mapController = controller;
               },
             ),
+            Positioned(
+              top: 20,
+              left: 20,
+              child: IconButton(
+                icon: Icon(Icons.menu, size: 20),
+                onPressed: () {},
+              ),
+            ),
             Positioned.fill(
               bottom: 0,
-              top: MediaQuery.of(context).size.height * 0.8,
+              top: MediaQuery.of(context).size.height * 0.9,
               left: 0,
               right: 0,
               child: Container(
@@ -78,7 +86,7 @@ class _MapViewState extends State<MapView> {
                     }
                   },
                 ),
-                margin: const EdgeInsets.only(bottom: 5),
+                margin: const EdgeInsets.only(bottom: 10),
                 color: const Color(0xFF57C0A4),
               ),
             ),
@@ -158,42 +166,41 @@ class _MapViewState extends State<MapView> {
 
   Widget cardRota(Rota rota) {
     return SizedBox(
-      width: 220,
-      height: 80,
+      width: MediaQuery.of(context).size.width * 0.4,
       child: Card(
+        elevation: 100,
+        shadowColor: Colors.white,
         child: GestureDetector(
           onTap: () {
             polylines.clear();
-            for (var i = 0; i < rota.parada.length - 1; i++) {
-              _createPolylines(
-                rota.parada[i].latitude,
-                rota.parada[i].longitude,
-                rota.parada[i + 1].latitude,
-                rota.parada[i + 1].longitude,
-                rota.nome,
-              ).then(
-                (value) {
-                  setState(() {
-                    polylines[value.polylineId] = value;
-                    markers.add(
-                      Marker(
-                        markerId: MarkerId(rota.nome),
-                        position: LatLng(
-                            rota.parada[i].latitude, rota.parada[i].longitude),
-                        infoWindow: InfoWindow(
-                          title: rota.nome,
-                        ),
+            _createPolylines(
+              rota.parada[0].latitude,
+              rota.parada[0].longitude,
+              rota.parada[rota.parada.length - 1].latitude,
+              rota.parada[rota.parada.length - 1].longitude,
+              rota.nome,
+            ).then(
+              (value) {
+                setState(() {
+                  polylines[value.polylineId] = value;
+                  markers.add(
+                    Marker(
+                      markerId: MarkerId(rota.nome),
+                      position: LatLng(
+                          rota.parada[0].latitude, rota.parada[0].longitude),
+                      infoWindow: InfoWindow(
+                        title: rota.nome,
                       ),
-                    );
-                  });
-                },
-              );
-            }
+                    ),
+                  );
+                });
+              },
+            );
           },
           child: Center(
               child: Text(
-            rota.id + ' - ' + rota.nome,
-            style: const TextStyle(color: Colors.white),
+            rota.nome,
+            style: const TextStyle(color: Colors.white, letterSpacing: 2),
           )),
         ),
         color: const Color(0xFF373D69),
