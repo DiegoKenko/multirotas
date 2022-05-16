@@ -123,7 +123,7 @@ class TelaLoginState extends State<TelaLogin> {
                       'lib/assets/carregamento.png',
                     ),
                     const Text(
-                      'Carregando...',
+                      'Carregando Multi Rotas...',
                       style: TextStyle(fontSize: 22),
                     )
                   ],
