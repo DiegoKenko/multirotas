@@ -14,12 +14,15 @@ class MapView extends StatefulWidget {
 
 class _MapViewState extends State<MapView> {
   CameraPosition _initialLocation = const CameraPosition(
-      target: LatLng(-19.49392296505924, -44.30632263820034), zoom: 16);
+    target: LatLng(-19.49392296505924, -44.30632263820034), // Multitécnica
+    zoom: 16,
+  );
   late GoogleMapController mapController;
   late PolylinePoints polylinePoints;
   final startAddressController = TextEditingController();
   Map<PolylineId, Polyline> polylines = {};
   List rotas = [];
+  List rotasProximas = [];
 
   Set<Marker> markers = {};
 
@@ -27,6 +30,7 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     _getStremLocation();
+    _rotasProximas();
   }
 
   @override
@@ -37,6 +41,10 @@ class _MapViewState extends State<MapView> {
       height: height,
       width: width,
       child: Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          actions: [],
+        ),
         body: Stack(
           alignment: AlignmentDirectional.bottomEnd,
           children: [
@@ -54,17 +62,9 @@ class _MapViewState extends State<MapView> {
                 mapController = controller;
               },
             ),
-            Positioned(
-              top: 20,
-              left: 5,
-              child: IconButton(
-                icon: const Icon(Icons.menu, size: 40),
-                onPressed: () {},
-              ),
-            ),
             Positioned.fill(
               bottom: 0,
-              top: MediaQuery.of(context).size.height * 0.9,
+              top: MediaQuery.of(context).size.height * 0.8,
               left: 0,
               right: 0,
               child: Container(
@@ -100,16 +100,22 @@ class _MapViewState extends State<MapView> {
   // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getStremLocation() async {
     Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.medium,
+      desiredAccuracy: LocationAccuracy.high,
     ).then(
       (position) {
         _initialLocation = CameraPosition(
-          target: LatLng(position.latitude, position.longitude),
+          target: LatLng(
+            position.latitude,
+            position.longitude,
+          ),
         );
         mapController.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(
-                target: LatLng(position.latitude, position.longitude),
+                target: LatLng(
+                  position.latitude,
+                  position.longitude,
+                ),
                 zoom: 15),
           ),
         );
@@ -118,28 +124,41 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<Polyline> _createPolylines(
-      double startLatitude,
-      double startLongitude,
-      double destinationLatitude,
-      double destinationLongitude,
-      String nomeId) async {
+    double startLatitude,
+    double startLongitude,
+    double destinationLatitude,
+    double destinationLongitude,
+    String nomeId,
+    List<PolylineWayPoint> paradas,
+  ) async {
     // Initializing PolylinePoints
     List<LatLng> polylineCoordinates = [];
     polylinePoints = PolylinePoints();
 
-    // Generating the list of coordinates to be used for
-    // drawing the polylines
+    // Generating the list of coordinates to be used for drawing the polylines
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
       'AIzaSyC-cAQ95icIXxAelzKYLjwVVDCw-KFmuBw', // Google Maps API Key
-      PointLatLng(startLatitude, startLongitude),
-      PointLatLng(destinationLatitude, destinationLongitude),
+      PointLatLng(
+        startLatitude,
+        startLongitude,
+      ),
+      PointLatLng(
+        destinationLatitude,
+        destinationLongitude,
+      ),
+      wayPoints: paradas,
       travelMode: TravelMode.driving,
     );
 
     // Adding the coordinates to the list
     if (result.points.isNotEmpty) {
       for (var point in result.points) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
+        polylineCoordinates.add(
+          LatLng(
+            point.latitude,
+            point.longitude,
+          ),
+        );
       }
     }
 
@@ -149,7 +168,7 @@ class _MapViewState extends State<MapView> {
     // Initializing Polyline
     Polyline polyline = Polyline(
       polylineId: id,
-      color: const Color(0xFF57C0A4),
+      color: const Color(0xFF40683E),
       points: polylineCoordinates,
       width: 3,
     );
@@ -165,6 +184,7 @@ class _MapViewState extends State<MapView> {
   }
 
   Widget cardRota(Rota rota) {
+    List<PolylineWayPoint> wayPoints = [];
     return SizedBox(
       width: MediaQuery.of(context).size.width * 0.4,
       child: Card(
@@ -172,13 +192,25 @@ class _MapViewState extends State<MapView> {
         shadowColor: Colors.white,
         child: GestureDetector(
           onTap: () {
+            wayPoints.clear();
             polylines.clear();
+            // Adiciona cada parada, exceto a primeira e a última
+            for (var i = 1; i < rota.parada.length - 1; i++) {
+              wayPoints.add(
+                PolylineWayPoint(
+                  location: rota.parada[i].latitude.toString() +
+                      ',' +
+                      rota.parada[i].longitude.toString(),
+                ),
+              );
+            }
             _createPolylines(
               rota.parada[0].latitude,
               rota.parada[0].longitude,
               rota.parada[rota.parada.length - 1].latitude,
               rota.parada[rota.parada.length - 1].longitude,
               rota.nome,
+              wayPoints,
             ).then(
               (value) {
                 setState(() {
@@ -187,7 +219,9 @@ class _MapViewState extends State<MapView> {
                     Marker(
                       markerId: MarkerId(rota.nome),
                       position: LatLng(
-                          rota.parada[0].latitude, rota.parada[0].longitude),
+                        rota.parada[0].latitude,
+                        rota.parada[0].longitude,
+                      ),
                       infoWindow: InfoWindow(
                         title: rota.nome,
                       ),
@@ -200,11 +234,21 @@ class _MapViewState extends State<MapView> {
           child: Center(
               child: Text(
             rota.nome,
-            style: const TextStyle(color: Colors.white, letterSpacing: 2),
+            style: const TextStyle(
+              color: Colors.white,
+              letterSpacing: 2,
+            ),
           )),
         ),
         color: const Color(0xFF373D69),
       ),
+    );
+  }
+
+  Future<void> _rotasProximas() async {
+    rotasProximas = await Firestore().rotasProximas(
+      double.parse('-19.48563694104591'),
+      double.parse(' -44.27729538359428'),
     );
   }
 }
