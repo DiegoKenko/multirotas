@@ -56,9 +56,9 @@ class _MapViewState extends State<MapView> {
             ),
             Positioned(
               top: 20,
-              left: 20,
+              left: 5,
               child: IconButton(
-                icon: Icon(Icons.menu, size: 20),
+                icon: const Icon(Icons.menu, size: 40),
                 onPressed: () {},
               ),
             ),
