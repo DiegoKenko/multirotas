@@ -48,11 +48,8 @@ class TelaLoginState extends State<TelaLogin> {
                 body: Container(
                   decoration: decDegrade(),
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        height: 250,
-                      ),
                       const Padding(
                         padding: EdgeInsets.only(
                             left: 20.0, right: 20, bottom: 20, top: 0),

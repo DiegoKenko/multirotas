@@ -1,7 +1,4 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -17,6 +14,8 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  double raioBuscaMetro = 2000;
+  bool cameraDinamica = false;
   bool ida = true;
   bool visualizaRotas = false;
   StreamSubscription<Position>? _currentPosition;
@@ -59,29 +58,97 @@ class _MapViewState extends State<MapView> {
       child: Scaffold(
         drawer: Drawer(
           child: Center(
-              child: Padding(
-            padding: const EdgeInsets.only(top: 80),
-            child: Column(children: const [
-              Text(
-                'câmera dinâmica',
-                style: TextStyle(
-                  color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 80),
+              child: Column(children: [
+                ListTile(
+                  leading: const Text(
+                    'Câmera dinâmica',
+                    style: TextStyle(
+                      color: Colors.white,
+                    ),
+                  ),
+                  trailing: Switch(
+                    inactiveThumbColor: Colors.white,
+                    activeColor: Colors.green,
+                    value: cameraDinamica,
+                    onChanged: (bool value) {
+                      setState(() {
+                        cameraDinamica = value;
+                      });
+                    },
+                  ),
                 ),
-              ),
-              Text(
-                'indo para  Multi / saindo da Multi',
-                style: TextStyle(
-                  color: Colors.white,
+                ListTile(
+                  leading: const Text(
+                    'Ida',
+                    style: TextStyle(
+                      color: Colors.white,
+                    ),
+                  ),
+                  trailing: Switch(
+                    inactiveThumbColor: Colors.white,
+                    activeColor: Colors.green,
+                    value: ida,
+                    onChanged: (bool value) {
+                      setState(() {
+                        ida = value;
+                        if (!ida) {
+                          visualizaRotas = ida;
+                        }
+                      });
+                    },
+                  ),
                 ),
-              ),
-              Text(
-                'visualizar todas rotas',
-                style: TextStyle(
-                  color: Colors.white,
+                ListTile(
+                  leading: const Text(
+                    'Exibir todas as rotas',
+                    style: TextStyle(
+                      color: Colors.white,
+                    ),
+                  ),
+                  trailing: Switch(
+                    inactiveThumbColor: Colors.white,
+                    activeColor: Colors.green,
+                    value: visualizaRotas,
+                    onChanged: (bool value) {
+                      setState(() {
+                        visualizaRotas = value;
+                      });
+                    },
+                  ),
                 ),
-              ),
-            ]),
-          )),
+                const Padding(
+                  padding: EdgeInsets.only(left: 20, right: 20, top: 60),
+                  child: Text(
+                    'alcance',
+                    style: TextStyle(
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(left: 20, right: 20),
+                  child: SizedBox(
+                    child: Slider(
+                      thumbColor: Colors.white,
+                      divisions: 5,
+                      label: '${raioBuscaMetro.round()}',
+                      inactiveColor: Colors.amber,
+                      value: raioBuscaMetro,
+                      onChanged: (value) {
+                        setState(() {
+                          raioBuscaMetro = value;
+                        });
+                      },
+                      min: 200,
+                      max: 2200,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ),
           elevation: 2,
           backgroundColor: Colors.transparent,
         ),
@@ -128,19 +195,21 @@ class _MapViewState extends State<MapView> {
                 ),
               ),
             ),
-            Positioned.fill(
-              bottom: 0,
-              top: MediaQuery.of(context).size.height * 0.8,
-              left: 0,
-              right: 0,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                itemCount: todasRotas.length,
-                itemBuilder: (context, index) {
-                  return cardRota(todasRotas[index]);
-                },
-              ),
-            ),
+            visualizaRotas
+                ? Positioned.fill(
+                    bottom: 0,
+                    top: MediaQuery.of(context).size.height * 0.8,
+                    left: 0,
+                    right: 0,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: todasRotas.length,
+                      itemBuilder: (context, index) {
+                        return cardRota(todasRotas[index]);
+                      },
+                    ),
+                  )
+                : Container()
           ],
         ),
       ),
@@ -159,6 +228,19 @@ class _MapViewState extends State<MapView> {
           event.longitude,
         ),
       );
+      /*  if (cameraDinamica) {
+        mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                _initialLocation.target.latitude,
+                _initialLocation.target.longitude,
+              ),
+              zoom: 15,
+            ),
+          ),
+        );
+      } */
       attCircle();
     });
   }
@@ -312,8 +394,8 @@ class _MapViewState extends State<MapView> {
     setState(() {
       circles = {
         Circle(
-          fillColor: Color.fromARGB(43, 94, 125, 212),
-          strokeColor: Color.fromRGBO(148, 169, 229, 0.2),
+          fillColor: const Color.fromARGB(43, 94, 125, 212),
+          strokeColor: const Color.fromRGBO(148, 169, 229, 0.2),
           circleId: const CircleId('id'),
           center: LatLng(_initialLocation.target.latitude,
               _initialLocation.target.longitude),

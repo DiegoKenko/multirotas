@@ -2,7 +2,7 @@ import 'dart:math';
 //https://github.com/shawnchan2014/haversine-dart/blob/master/Haversine.dart
 
 class Haversine {
-  static final R = 6372.8; // Em kilometros
+  static const R = 6372.8; // Em kilometros
   static double haversine(double lat1, lon1, lat2, lon2) {
     double dLat = _toRadians(lat2 - lat1);
     double dLon = _toRadians(lon2 - lon1);
