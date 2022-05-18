@@ -26,7 +26,7 @@ class Firestore {
   }
 
   Future<List<Rota>> rotasProximas(double lat, double long) async {
-    double distanciaMax = 2; // Em kilometros
+    double distanciaMax = 1; // Em kilometros
     List<Rota> rotas = [];
     var x = await FirebaseFirestore.instance.collection('rotas').get();
     for (var element in x.docs) {

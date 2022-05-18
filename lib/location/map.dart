@@ -1,3 +1,7 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -13,6 +17,10 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  bool ida = true;
+  bool visualizaRotas = false;
+  StreamSubscription<Position>? _currentPosition;
+  final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(-19.49392296505924, -44.30632263820034), // Multitécnica
     zoom: 16,
@@ -21,16 +29,24 @@ class _MapViewState extends State<MapView> {
   late PolylinePoints polylinePoints;
   final startAddressController = TextEditingController();
   Map<PolylineId, Polyline> polylines = {};
-  List rotas = [];
+  List todasRotas = [];
   List rotasProximas = [];
-
   Set<Marker> markers = {};
+  Set<Circle> circles = {};
 
   @override
   void initState() {
     super.initState();
+    _getRotas();
     _getStremLocation();
     _rotasProximas();
+  }
+
+  @override
+  void dispose() {
+    _currentPosition?.cancel();
+    _currentPosition = null;
+    super.dispose();
   }
 
   @override
@@ -41,15 +57,43 @@ class _MapViewState extends State<MapView> {
       height: height,
       width: width,
       child: Scaffold(
+        drawer: Drawer(
+          child: Center(
+              child: Padding(
+            padding: const EdgeInsets.only(top: 80),
+            child: Column(children: const [
+              Text(
+                'câmera dinâmica',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                'indo para  Multi / saindo da Multi',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+              Text(
+                'visualizar todas rotas',
+                style: TextStyle(
+                  color: Colors.white,
+                ),
+              ),
+            ]),
+          )),
+          elevation: 2,
+          backgroundColor: Colors.transparent,
+        ),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
-          actions: [],
         ),
         body: Stack(
           alignment: AlignmentDirectional.bottomEnd,
           children: [
             GoogleMap(
-              //markers: Set<Marker>.from(markers),
+              markers: Set<Marker>.from(markers),
+              //mapToolbarEnabled: true,
               compassEnabled: true,
               polylines: Set<Polyline>.of(polylines.values),
               initialCameraPosition: _initialLocation,
@@ -61,33 +105,40 @@ class _MapViewState extends State<MapView> {
               onMapCreated: (GoogleMapController controller) {
                 mapController = controller;
               },
+              circles: circles,
+            ),
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.7,
+              left: MediaQuery.of(context).size.width * 0.75,
+              child: ClipOval(
+                child: SizedBox(
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.refresh,
+                      color: Colors.green,
+                      size: 60,
+                    ),
+                    onPressed: () {
+                      _getStremLocation();
+                      _rotasProximas();
+                    },
+                  ),
+                  height: 70,
+                  width: 70,
+                ),
+              ),
             ),
             Positioned.fill(
               bottom: 0,
               top: MediaQuery.of(context).size.height * 0.8,
               left: 0,
               right: 0,
-              child: Container(
-                child: FutureBuilder(
-                  future: _getRotas(),
-                  builder: (context, AsyncSnapshot snap) {
-                    if (snap.hasData) {
-                      return ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: snap.data.length,
-                        itemBuilder: (context, index) {
-                          return cardRota(snap.data[index]);
-                        },
-                      );
-                    } else {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
-                  },
-                ),
-                margin: const EdgeInsets.only(bottom: 10),
-                color: const Color(0xFF57C0A4),
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: todasRotas.length,
+                itemBuilder: (context, index) {
+                  return cardRota(todasRotas[index]);
+                },
               ),
             ),
           ],
@@ -99,28 +150,17 @@ class _MapViewState extends State<MapView> {
   // Atualização da localização como stream.
   // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getStremLocation() async {
-    Geolocator.getCurrentPosition(
+    _currentPosition = Geolocator.getPositionStream(
       desiredAccuracy: LocationAccuracy.high,
-    ).then(
-      (position) {
-        _initialLocation = CameraPosition(
-          target: LatLng(
-            position.latitude,
-            position.longitude,
-          ),
-        );
-        mapController.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-                target: LatLng(
-                  position.latitude,
-                  position.longitude,
-                ),
-                zoom: 15),
-          ),
-        );
-      },
-    );
+    ).listen((event) {
+      _initialLocation = CameraPosition(
+        target: LatLng(
+          event.latitude,
+          event.longitude,
+        ),
+      );
+      attCircle();
+    });
   }
 
   Future<Polyline> _createPolylines(
@@ -179,8 +219,8 @@ class _MapViewState extends State<MapView> {
 
   // Atualização stream da localização dos ônibus
   // Os ônibus são identificados como marcadores
-  Future<List> _getRotas() async {
-    return await Firestore().todasRotas();
+  _getRotas() async {
+    todasRotas = await Firestore().todasRotas();
   }
 
   Widget cardRota(Rota rota) {
@@ -188,7 +228,6 @@ class _MapViewState extends State<MapView> {
     return SizedBox(
       width: MediaQuery.of(context).size.width * 0.4,
       child: Card(
-        elevation: 100,
         shadowColor: Colors.white,
         child: GestureDetector(
           onTap: () {
@@ -213,21 +252,7 @@ class _MapViewState extends State<MapView> {
               wayPoints,
             ).then(
               (value) {
-                setState(() {
-                  polylines[value.polylineId] = value;
-                  markers.add(
-                    Marker(
-                      markerId: MarkerId(rota.nome),
-                      position: LatLng(
-                        rota.parada[0].latitude,
-                        rota.parada[0].longitude,
-                      ),
-                      infoWindow: InfoWindow(
-                        title: rota.nome,
-                      ),
-                    ),
-                  );
-                });
+                montaPolyline(value, rota);
               },
             );
           },
@@ -246,9 +271,74 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _rotasProximas() async {
-    rotasProximas = await Firestore().rotasProximas(
-      double.parse('-19.48563694104591'),
-      double.parse(' -44.27729538359428'),
+    Set<Marker> tempMarker = {};
+    List<Rota> rotasProximas = await Firestore().rotasProximas(
+      double.parse(_initialLocation.target.latitude.toString()),
+      double.parse(_initialLocation.target.longitude.toString()),
     );
+    for (var i = 0; i < rotasProximas.length; i++) {
+      for (var j = 0; j < rotasProximas[i].parada.length; j++) {
+        /*  final rotaMatch = todasRotas
+            .firstWhere((element) => element.id == 'rota1', orElse: () {
+          return null;
+        }); */
+        tempMarker.add(
+          Marker(
+            onTap: () {
+              /*     montaPolyline(
+                Polyline(polylineId: PolylineId(rotasProximas[i].id)),
+                rotaMatch,
+              ); */
+            },
+            markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
+            position: LatLng(rotasProximas[i].parada[j].latitude,
+                rotasProximas[i].parada[j].longitude),
+            infoWindow: InfoWindow(
+              title: rotasProximas[i].nome,
+              snippet: rotasProximas[i].id,
+            ),
+            icon: BitmapDescriptor.defaultMarker,
+          ),
+        );
+      }
+    }
+    setState(() {
+      markers.clear();
+      markers = tempMarker;
+    });
+  }
+
+  attCircle() {
+    setState(() {
+      circles = {
+        Circle(
+          fillColor: Color.fromARGB(43, 94, 125, 212),
+          strokeColor: Color.fromRGBO(148, 169, 229, 0.2),
+          circleId: const CircleId('id'),
+          center: LatLng(_initialLocation.target.latitude,
+              _initialLocation.target.longitude),
+          radius: 1000,
+        )
+      };
+    });
+  }
+
+  montaPolyline(Polyline value, Rota rota) {
+    polylines.clear();
+    setState(() {
+      polylines[value.polylineId] = value;
+      markers.add(
+        Marker(
+          markerId: MarkerId(rota.nome),
+          position: LatLng(
+            rota.parada[0].latitude,
+            rota.parada[0].longitude,
+          ),
+          infoWindow: InfoWindow(
+            title: rota.nome,
+          ),
+        ),
+      );
+    });
   }
 }
