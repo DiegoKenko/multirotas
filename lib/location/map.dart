@@ -14,15 +14,15 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  double raioBuscaMetro = 2000;
-  bool cameraDinamica = false;
+  double raioBuscaMetro = 1000;
+  bool cameraDinamica = true;
   bool ida = true;
   bool visualizaRotas = false;
   StreamSubscription<Position>? _currentPosition;
   final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(-19.49392296505924, -44.30632263820034), // Multitécnica
-    zoom: 16,
+    zoom: 15,
   );
   late GoogleMapController mapController;
   late PolylinePoints polylinePoints;
@@ -32,13 +32,13 @@ class _MapViewState extends State<MapView> {
   List rotasProximas = [];
   Set<Marker> markers = {};
   Set<Circle> circles = {};
+  late Rota rotaAtual;
 
   @override
   void initState() {
     super.initState();
     _getRotas();
     _getStremLocation();
-    _rotasProximas();
   }
 
   @override
@@ -61,24 +61,6 @@ class _MapViewState extends State<MapView> {
             child: Padding(
               padding: const EdgeInsets.only(top: 80),
               child: Column(children: [
-                ListTile(
-                  leading: const Text(
-                    'Câmera dinâmica',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  trailing: Switch(
-                    inactiveThumbColor: Colors.white,
-                    activeColor: Colors.green,
-                    value: cameraDinamica,
-                    onChanged: (bool value) {
-                      setState(() {
-                        cameraDinamica = value;
-                      });
-                    },
-                  ),
-                ),
                 ListTile(
                   leading: const Text(
                     'Ida',
@@ -160,6 +142,7 @@ class _MapViewState extends State<MapView> {
           children: [
             GoogleMap(
               markers: Set<Marker>.from(markers),
+
               //mapToolbarEnabled: true,
               compassEnabled: true,
               polylines: Set<Polyline>.of(polylines.values),
@@ -175,19 +158,18 @@ class _MapViewState extends State<MapView> {
               circles: circles,
             ),
             Positioned(
-              top: MediaQuery.of(context).size.height * 0.7,
+              top: MediaQuery.of(context).size.height * 0.75,
               left: MediaQuery.of(context).size.width * 0.75,
               child: ClipOval(
                 child: SizedBox(
                   child: IconButton(
-                    icon: const Icon(
-                      Icons.refresh,
-                      color: Colors.green,
-                      size: 60,
+                    icon: Icon(
+                      Icons.navigation,
+                      color: cameraDinamica ? Color(0xFF57C0A4) : Colors.grey,
+                      size: 50,
                     ),
                     onPressed: () {
-                      _getStremLocation();
-                      _rotasProximas();
+                      cameraDinamica = !cameraDinamica;
                     },
                   ),
                   height: 70,
@@ -228,7 +210,7 @@ class _MapViewState extends State<MapView> {
           event.longitude,
         ),
       );
-      /*  if (cameraDinamica) {
+      if (cameraDinamica) {
         mapController.animateCamera(
           CameraUpdate.newCameraPosition(
             CameraPosition(
@@ -240,7 +222,8 @@ class _MapViewState extends State<MapView> {
             ),
           ),
         );
-      } */
+      }
+      _rotasProximas();
       attCircle();
     });
   }
@@ -306,37 +289,14 @@ class _MapViewState extends State<MapView> {
   }
 
   Widget cardRota(Rota rota) {
-    List<PolylineWayPoint> wayPoints = [];
     return SizedBox(
       width: MediaQuery.of(context).size.width * 0.4,
       child: Card(
         shadowColor: Colors.white,
         child: GestureDetector(
           onTap: () {
-            wayPoints.clear();
             polylines.clear();
-            // Adiciona cada parada, exceto a primeira e a última
-            for (var i = 1; i < rota.parada.length - 1; i++) {
-              wayPoints.add(
-                PolylineWayPoint(
-                  location: rota.parada[i].latitude.toString() +
-                      ',' +
-                      rota.parada[i].longitude.toString(),
-                ),
-              );
-            }
-            _createPolylines(
-              rota.parada[0].latitude,
-              rota.parada[0].longitude,
-              rota.parada[rota.parada.length - 1].latitude,
-              rota.parada[rota.parada.length - 1].longitude,
-              rota.nome,
-              wayPoints,
-            ).then(
-              (value) {
-                montaPolyline(value, rota);
-              },
-            );
+            montaPolyline(rota);
           },
           child: Center(
               child: Text(
@@ -355,33 +315,31 @@ class _MapViewState extends State<MapView> {
   Future<void> _rotasProximas() async {
     Set<Marker> tempMarker = {};
     List<Rota> rotasProximas = await Firestore().rotasProximas(
-      double.parse(_initialLocation.target.latitude.toString()),
-      double.parse(_initialLocation.target.longitude.toString()),
-    );
+        double.parse(_initialLocation.target.latitude.toString()),
+        double.parse(_initialLocation.target.longitude.toString()),
+        raioBuscaMetro / 1000);
     for (var i = 0; i < rotasProximas.length; i++) {
       for (var j = 0; j < rotasProximas[i].parada.length; j++) {
-        /*  final rotaMatch = todasRotas
-            .firstWhere((element) => element.id == 'rota1', orElse: () {
-          return null;
-        }); */
-        tempMarker.add(
-          Marker(
-            onTap: () {
-              /*     montaPolyline(
-                Polyline(polylineId: PolylineId(rotasProximas[i].id)),
-                rotaMatch,
-              ); */
-            },
-            markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
-            position: LatLng(rotasProximas[i].parada[j].latitude,
-                rotasProximas[i].parada[j].longitude),
-            infoWindow: InfoWindow(
-              title: rotasProximas[i].nome,
-              snippet: rotasProximas[i].id,
-            ),
-            icon: BitmapDescriptor.defaultMarker,
+        final rotaTemp = rotasProximas[i];
+        Marker markTemp = Marker(
+          zIndex: i * 10.2 + j,
+          onTap: () {
+            setState(() {
+              visualizaRotas = false;
+              montaPolyline(todasRotas
+                  .firstWhere((element) => (element.id == rotaTemp.id)));
+            });
+          },
+          markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
+          position: LatLng(rotasProximas[i].parada[j].latitude,
+              rotasProximas[i].parada[j].longitude),
+          infoWindow: InfoWindow(
+            title: rotasProximas[i].nome,
+            snippet: rotasProximas[i].id,
           ),
+          icon: BitmapDescriptor.defaultMarker,
         );
+        tempMarker.add(markTemp);
       }
     }
     setState(() {
@@ -399,28 +357,41 @@ class _MapViewState extends State<MapView> {
           circleId: const CircleId('id'),
           center: LatLng(_initialLocation.target.latitude,
               _initialLocation.target.longitude),
-          radius: 1000,
+          radius: raioBuscaMetro,
         )
       };
     });
   }
 
-  montaPolyline(Polyline value, Rota rota) {
-    polylines.clear();
-    setState(() {
-      polylines[value.polylineId] = value;
-      markers.add(
-        Marker(
-          markerId: MarkerId(rota.nome),
-          position: LatLng(
-            rota.parada[0].latitude,
-            rota.parada[0].longitude,
-          ),
-          infoWindow: InfoWindow(
-            title: rota.nome,
-          ),
+  montaPolyline(Rota rota) {
+    List<PolylineWayPoint> wayPoints = [];
+    // Adiciona cada parada, exceto a primeira e a última
+    for (var i = 1; i < rota.parada.length - 1; i++) {
+      wayPoints.add(
+        PolylineWayPoint(
+          location: rota.parada[i].latitude.toString() +
+              ',' +
+              rota.parada[i].longitude.toString(),
         ),
       );
-    });
+    }
+    _createPolylines(
+      rota.parada[0].latitude,
+      rota.parada[0].longitude,
+      rota.parada[rota.parada.length - 1].latitude,
+      rota.parada[rota.parada.length - 1].longitude,
+      rota.nome,
+      wayPoints,
+    ).then(
+      (value) {
+        rotaAtual = rota;
+        polylines.clear();
+        setState(
+          () {
+            polylines[value.polylineId] = value;
+          },
+        );
+      },
+    );
   }
 }
