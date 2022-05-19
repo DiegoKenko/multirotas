@@ -16,6 +16,7 @@ class MapView extends StatefulWidget {
 class _MapViewState extends State<MapView> {
   double raioBuscaMetro = 1000;
   bool cameraDinamica = true;
+  bool mostraRotaAtual = false;
   bool ida = true;
   bool visualizaRotas = false;
   StreamSubscription<Position>? _currentPosition;
@@ -156,6 +157,35 @@ class _MapViewState extends State<MapView> {
                 mapController = controller;
               },
               circles: circles,
+            ),
+            Positioned(
+              top: 0,
+              bottom: MediaQuery.of(context).size.height * 0.80,
+              left: 0,
+              right: 0,
+              child: mostraRotaAtual
+                  ? Container(
+                      child: ListTile(
+                        title: Center(
+                          child: Text(
+                            'nome da rota',
+                            style: TextStyle(fontSize: 30),
+                          ),
+                        ),
+                        trailing: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              mostraRotaAtual = false;
+                              polylines.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.close, size: 40),
+                        ),
+                      ),
+                      height: 40,
+                      color: const Color.fromRGBO(255, 255, 255, 0.4),
+                    )
+                  : Container(),
             ),
             Positioned(
               top: MediaQuery.of(context).size.height * 0.75,
@@ -322,12 +352,13 @@ class _MapViewState extends State<MapView> {
       for (var j = 0; j < rotasProximas[i].parada.length; j++) {
         final rotaTemp = rotasProximas[i];
         Marker markTemp = Marker(
-          zIndex: i * 10.2 + j,
+          zIndex: i * 10.0 + j,
           onTap: () {
             setState(() {
               visualizaRotas = false;
               montaPolyline(todasRotas
                   .firstWhere((element) => (element.id == rotaTemp.id)));
+              mostraRotaAtual = true;
             });
           },
           markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
