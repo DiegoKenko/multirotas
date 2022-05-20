@@ -168,7 +168,7 @@ class _MapViewState extends State<MapView> {
                       child: ListTile(
                         title: Center(
                           child: Text(
-                            'nome da rota',
+                            rotaAtual.nome,
                             style: TextStyle(fontSize: 30),
                           ),
                         ),
@@ -350,14 +350,16 @@ class _MapViewState extends State<MapView> {
         raioBuscaMetro / 1000);
     for (var i = 0; i < rotasProximas.length; i++) {
       for (var j = 0; j < rotasProximas[i].parada.length; j++) {
-        final rotaTemp = rotasProximas[i];
+        Rota rotaTempProx = rotasProximas[i];
         Marker markTemp = Marker(
           zIndex: i * 10.0 + j,
           onTap: () {
+            Rota rotaTemp = todasRotas
+                .firstWhere((element) => (element.id == rotaTempProx.id));
             setState(() {
+              rotaAtual = rotaTemp;
+              montaPolyline(rotaTemp);
               visualizaRotas = false;
-              montaPolyline(todasRotas
-                  .firstWhere((element) => (element.id == rotaTemp.id)));
               mostraRotaAtual = true;
             });
           },
@@ -415,7 +417,6 @@ class _MapViewState extends State<MapView> {
       wayPoints,
     ).then(
       (value) {
-        rotaAtual = rota;
         polylines.clear();
         setState(
           () {
