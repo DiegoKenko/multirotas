@@ -50,8 +50,10 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-  - lib/assets/main.png
-  - lib/assets/carregamento.png
+  - assets/carregamento.png
+  - assets/mtMap.png
+  - assets/paradaMap.png
+  - assets/mapStyle.json
 flutter_icons:
   android: "launcher_icon"
   ios: true
