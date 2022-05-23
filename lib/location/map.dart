@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
@@ -14,7 +16,10 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  static const double latMulti = -19.49392296505924;
+  static const double longMult = -44.30632263820034;
   double raioBuscaMetro = 1000;
+  bool normalMap = true;
   bool cameraDinamica = true;
   bool mostraRotaAtual = false;
   bool ida = true;
@@ -22,7 +27,7 @@ class _MapViewState extends State<MapView> {
   StreamSubscription<Position>? _currentPosition;
   final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
-    target: LatLng(-19.49392296505924, -44.30632263820034), // Multitécnica
+    target: LatLng(latMulti, longMult), // Multitécnica
     zoom: 15,
   );
   late GoogleMapController mapController;
@@ -129,6 +134,23 @@ class _MapViewState extends State<MapView> {
                     ),
                   ),
                 ),
+                ListTile(
+                    leading: const Text(
+                      'Estilo do mapa ',
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                    trailing: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            normalMap = !normalMap;
+                          });
+                        },
+                        icon: Icon(
+                          Icons.map,
+                          color: normalMap ? Colors.grey : Colors.green,
+                        )))
               ]),
             ),
           ),
@@ -142,20 +164,21 @@ class _MapViewState extends State<MapView> {
           alignment: AlignmentDirectional.bottomEnd,
           children: [
             GoogleMap(
+              onMapCreated: (GoogleMapController controller) {
+                mapController = controller;
+                changeMapMode(mapController);
+              },
               markers: Set<Marker>.from(markers),
-
               //mapToolbarEnabled: true,
               compassEnabled: true,
               polylines: Set<Polyline>.of(polylines.values),
               initialCameraPosition: _initialLocation,
               myLocationEnabled: true,
               myLocationButtonEnabled: false,
-              mapType: MapType.normal,
+              mapType: normalMap ? MapType.normal : MapType.satellite,
               zoomGesturesEnabled: true,
               zoomControlsEnabled: false,
-              onMapCreated: (GoogleMapController controller) {
-                mapController = controller;
-              },
+
               circles: circles,
             ),
             Positioned(
@@ -169,7 +192,7 @@ class _MapViewState extends State<MapView> {
                         title: Center(
                           child: Text(
                             rotaAtual.nome,
-                            style: TextStyle(fontSize: 30),
+                            style: const TextStyle(fontSize: 30),
                           ),
                         ),
                         trailing: IconButton(
@@ -195,7 +218,9 @@ class _MapViewState extends State<MapView> {
                   child: IconButton(
                     icon: Icon(
                       Icons.navigation,
-                      color: cameraDinamica ? Color(0xFF57C0A4) : Colors.grey,
+                      color: cameraDinamica
+                          ? const Color(0xFF57C0A4)
+                          : Colors.grey,
                       size: 50,
                     ),
                     onPressed: () {
@@ -303,7 +328,7 @@ class _MapViewState extends State<MapView> {
     // Initializing Polyline
     Polyline polyline = Polyline(
       polylineId: id,
-      color: const Color(0xFF40683E),
+      color: const Color.fromARGB(255, 241, 112, 7),
       points: polylineCoordinates,
       width: 3,
     );
@@ -343,6 +368,9 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _rotasProximas() async {
+    var markerMulti = await markerMulit();
+    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
     Set<Marker> tempMarker = {};
     List<Rota> rotasProximas = await Firestore().rotasProximas(
         double.parse(_initialLocation.target.latitude.toString()),
@@ -361,6 +389,7 @@ class _MapViewState extends State<MapView> {
               montaPolyline(rotaTemp);
               visualizaRotas = false;
               mostraRotaAtual = true;
+              cameraDinamica = false;
             });
           },
           markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
@@ -368,17 +397,33 @@ class _MapViewState extends State<MapView> {
               rotasProximas[i].parada[j].longitude),
           infoWindow: InfoWindow(
             title: rotasProximas[i].nome,
-            snippet: rotasProximas[i].id,
+            snippet: rotasProximas[i].parada[j].latitude.toString() +
+                ' | ' +
+                rotasProximas[i].parada[j].longitude.toString(),
           ),
-          icon: BitmapDescriptor.defaultMarker,
+          icon: iconMarkerParada,
         );
         tempMarker.add(markTemp);
       }
     }
     setState(() {
       markers.clear();
+      tempMarker.add(markerMulti);
       markers = tempMarker;
     });
+  }
+
+  Future<Marker> markerMulit() async {
+    var iconMarkerMulti = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(100, 100)), "assets/mtMap.png");
+    return Marker(
+      markerId: const MarkerId('mt'),
+      position: const LatLng(latMulti, longMult),
+      infoWindow: const InfoWindow(
+        title: 'Grupo Multitécnica',
+      ),
+      icon: iconMarkerMulti,
+    );
   }
 
   attCircle() {
@@ -425,5 +470,23 @@ class _MapViewState extends State<MapView> {
         );
       },
     );
+  }
+
+  // Alteração do layout do map
+  void changeMapMode(GoogleMapController mapController) {
+    getJsonFile("assets/mapStyle.json")
+        .then((value) => setMapStyle(value, mapController));
+  }
+
+  //helper function
+  void setMapStyle(String mapStyle, GoogleMapController mapController) {
+    mapController.setMapStyle(mapStyle);
+  }
+
+  //helper function
+  Future<String> getJsonFile(String path) async {
+    ByteData byte = await rootBundle.load(path);
+    var list = byte.buffer.asUint8List(byte.offsetInBytes, byte.lengthInBytes);
+    return utf8.decode(list);
   }
 }

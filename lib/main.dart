@@ -117,7 +117,7 @@ class TelaLoginState extends State<TelaLogin> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     Image.asset(
-                      'lib/assets/carregamento.png',
+                      'assets/carregamento.png',
                     ),
                     const Text(
                       'Carregando...',
