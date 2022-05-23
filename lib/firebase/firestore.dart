@@ -14,9 +14,12 @@ class Firestore {
     return null;
   }
 
-  Future<List<Rota>> todasRotas() async {
+  Future<List<Rota>> todasRotas(bool ida) async {
     List<Rota> rotas = [];
-    var x = await FirebaseFirestore.instance.collection('rotas').get();
+    var x = await FirebaseFirestore.instance
+        .collection('rotas')
+        .where('ida', isEqualTo: ida)
+        .get();
     for (var element in x.docs) {
       rotas.add(Rota.fromMap(element.data()));
     }
@@ -24,12 +27,15 @@ class Firestore {
   }
 
   Future<List<Rota>> rotasProximas(
-      double latPosAtual, double longPosAtual, double raioKm) async {
+      double latPosAtual, double longPosAtual, double raioKm, bool ida) async {
     double distanciaMinMulti = 1; // Em kilometros
     double latMulti = -19.49392296505924;
     double longMulti = -44.30632263820034;
     List<Rota> rotas = [];
-    var x = await FirebaseFirestore.instance.collection('rotas').get();
+    var x = await FirebaseFirestore.instance
+        .collection('rotas')
+        .where('ida', isEqualTo: ida)
+        .get();
     for (var element in x.docs) {
       Rota r = Rota.fromMap(element.data());
       for (var p = r.parada.length - 1; p >= 0; p--) {

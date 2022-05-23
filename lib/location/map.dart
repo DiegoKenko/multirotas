@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:multirotas/class/Rota.dart';
@@ -39,6 +40,9 @@ class _MapViewState extends State<MapView> {
   Set<Marker> markers = {};
   Set<Circle> circles = {};
   late Rota rotaAtual;
+  TextEditingController buscaControllerDestino = TextEditingController();
+  bool buscandoDestino = false;
+  String queryBuscaDestino = "";
 
   @override
   void initState() {
@@ -159,6 +163,23 @@ class _MapViewState extends State<MapView> {
         ),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
+          title: ida
+              ? Container()
+              : Center(
+                  child: TextField(
+                    controller: buscaControllerDestino,
+                    decoration: InputDecoration(
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: () {
+                          buscaRotaPorEndereco();
+                        },
+                      ),
+                      hintText: 'destino...',
+                    ),
+                  ),
+                ),
+          actions: const [],
         ),
         body: Stack(
           alignment: AlignmentDirectional.bottomEnd,
@@ -278,7 +299,9 @@ class _MapViewState extends State<MapView> {
           ),
         );
       }
-      _rotasProximas();
+      if (ida) {
+        _rotasProximasIda();
+      }
       attCircle();
     });
   }
@@ -340,7 +363,7 @@ class _MapViewState extends State<MapView> {
   // Atualização stream da localização dos ônibus
   // Os ônibus são identificados como marcadores
   _getRotas() async {
-    todasRotas = await Firestore().todasRotas();
+    todasRotas = await Firestore().todasRotas(ida);
   }
 
   Widget cardRota(Rota rota) {
@@ -367,15 +390,16 @@ class _MapViewState extends State<MapView> {
     );
   }
 
-  Future<void> _rotasProximas() async {
-    var markerMulti = await markerMulit();
+  Future<void> _rotasProximasIda() async {
+    final markerMult = await markerMulti();
     var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
     Set<Marker> tempMarker = {};
     List<Rota> rotasProximas = await Firestore().rotasProximas(
         double.parse(_initialLocation.target.latitude.toString()),
         double.parse(_initialLocation.target.longitude.toString()),
-        raioBuscaMetro / 1000);
+        raioBuscaMetro / 1000,
+        ida);
     for (var i = 0; i < rotasProximas.length; i++) {
       for (var j = 0; j < rotasProximas[i].parada.length; j++) {
         Rota rotaTempProx = rotasProximas[i];
@@ -408,12 +432,12 @@ class _MapViewState extends State<MapView> {
     }
     setState(() {
       markers.clear();
-      tempMarker.add(markerMulti);
+      tempMarker.add(markerMult);
       markers = tempMarker;
     });
   }
 
-  Future<Marker> markerMulit() async {
+  Future<Marker> markerMulti() async {
     var iconMarkerMulti = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/mtMap.png");
     return Marker(
@@ -488,5 +512,93 @@ class _MapViewState extends State<MapView> {
     ByteData byte = await rootBundle.load(path);
     var list = byte.buffer.asUint8List(byte.offsetInBytes, byte.lengthInBytes);
     return utf8.decode(list);
+  }
+
+  // Busca as rotas mais próxima dentro do raio do endereço(lat long) passado
+  buscaRotaPorEndereco() async {
+    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
+    int counter = 0;
+    Set<Marker> markerVolta = {};
+    // adiciona 'sete lagoas' na busca do endereço
+    String endereco = buscaControllerDestino.text + 'sete lagoas';
+    List<Location> locais =
+        await locationFromAddress(endereco, localeIdentifier: 'pt_BR');
+
+    // para cada local encontrado, deve-se adicionar um marcador, ao clicar no marcador, apresentará as rotas próximas.
+    for (var element in locais) {
+      counter++;
+      markerVolta.add(Marker(
+        onTap: () {},
+        markerId: MarkerId(counter.toString()),
+        position: LatLng(element.latitude, element.longitude),
+        infoWindow: InfoWindow(title: buscaControllerDestino.text),
+        onDrag: (obj) {},
+        icon: iconMarkerParada,
+      ));
+      setState(() {
+        markers.clear();
+        markers = markerVolta;
+        cameraDinamica = false;
+        mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                element.latitude,
+                element.longitude,
+              ),
+              zoom: 14,
+            ),
+          ),
+        );
+      });
+    }
+  }
+
+  Future<void> _rotasProximasVolta(Position pos) async {
+    final markerMult = await markerMulti();
+    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
+    Set<Marker> tempMarker = {};
+    List<Rota> rotasProximas = await Firestore().rotasProximas(
+        double.parse(pos.latitude.toString()),
+        double.parse(pos.longitude.toString()),
+        raioBuscaMetro / 1000,
+        ida);
+    for (var i = 0; i < rotasProximas.length; i++) {
+      for (var j = 0; j < rotasProximas[i].parada.length; j++) {
+        Rota rotaTempProx = rotasProximas[i];
+        Marker markTemp = Marker(
+          zIndex: i * 10.0 + j,
+          onTap: () {
+            Rota rotaTemp = todasRotas
+                .firstWhere((element) => (element.id == rotaTempProx.id));
+            setState(() {
+              rotaAtual = rotaTemp;
+              montaPolyline(rotaTemp);
+              visualizaRotas = false;
+              mostraRotaAtual = true;
+              cameraDinamica = false;
+            });
+          },
+          markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
+          position: LatLng(rotasProximas[i].parada[j].latitude,
+              rotasProximas[i].parada[j].longitude),
+          infoWindow: InfoWindow(
+            title: rotasProximas[i].nome,
+            snippet: rotasProximas[i].parada[j].latitude.toString() +
+                ' | ' +
+                rotasProximas[i].parada[j].longitude.toString(),
+          ),
+          icon: iconMarkerParada,
+        );
+        tempMarker.add(markTemp);
+      }
+    }
+    setState(() {
+      markers.clear();
+      tempMarker.add(markerMult);
+      markers = tempMarker;
+    });
   }
 }
