@@ -172,6 +172,7 @@ class _MapViewState extends State<MapView> {
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.search),
                         onPressed: () {
+                          FocusScope.of(context).unfocus(); // esconder teclado
                           buscaRotaPorEndereco();
                         },
                       ),
@@ -301,8 +302,11 @@ class _MapViewState extends State<MapView> {
       }
       if (ida) {
         _rotasProximasIda();
+        setState(() {
+          attCircle(LatLng(_initialLocation.target.latitude,
+              _initialLocation.target.longitude));
+        });
       }
-      attCircle();
     });
   }
 
@@ -363,7 +367,7 @@ class _MapViewState extends State<MapView> {
   // Atualização stream da localização dos ônibus
   // Os ônibus são identificados como marcadores
   _getRotas() async {
-    todasRotas = await Firestore().todasRotas(ida);
+    todasRotas = await Firestore().todasRotas();
   }
 
   Widget cardRota(Rota rota) {
@@ -450,19 +454,16 @@ class _MapViewState extends State<MapView> {
     );
   }
 
-  attCircle() {
-    setState(() {
-      circles = {
-        Circle(
-          fillColor: const Color.fromARGB(43, 94, 125, 212),
-          strokeColor: const Color.fromRGBO(148, 169, 229, 0.2),
-          circleId: const CircleId('id'),
-          center: LatLng(_initialLocation.target.latitude,
-              _initialLocation.target.longitude),
-          radius: raioBuscaMetro,
-        )
-      };
-    });
+  attCircle(LatLng latLng) {
+    circles = {
+      Circle(
+        fillColor: const Color.fromARGB(43, 94, 125, 212),
+        strokeColor: const Color.fromRGBO(148, 169, 229, 0.2),
+        circleId: const CircleId('id'),
+        center: LatLng(latLng.latitude, latLng.longitude),
+        radius: raioBuscaMetro,
+      )
+    };
   }
 
   montaPolyline(Rota rota) {
@@ -526,37 +527,44 @@ class _MapViewState extends State<MapView> {
         await locationFromAddress(endereco, localeIdentifier: 'pt_BR');
 
     // para cada local encontrado, deve-se adicionar um marcador, ao clicar no marcador, apresentará as rotas próximas.
-    for (var element in locais) {
-      counter++;
-      markerVolta.add(Marker(
-        onTap: () {},
-        markerId: MarkerId(counter.toString()),
-        position: LatLng(element.latitude, element.longitude),
-        infoWindow: InfoWindow(title: buscaControllerDestino.text),
-        onDrag: (obj) {},
-        icon: iconMarkerParada,
-      ));
-      setState(() {
-        markers.clear();
-        markers = markerVolta;
-        cameraDinamica = false;
-        mapController.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(
-                element.latitude,
-                element.longitude,
-              ),
-              zoom: 14,
+    var latLng = LatLng(locais.first.latitude, locais.first.longitude);
+    _rotasProximasVolta(latLng);
+    counter++;
+    markerVolta.add(Marker(
+      markerId: MarkerId(counter.toString()),
+      position: LatLng(locais.first.latitude, locais.first.longitude),
+      infoWindow: InfoWindow(title: buscaControllerDestino.text),
+      onDrag: (obj) {},
+      icon: iconMarkerParada,
+    ));
+
+    setState(() {
+      markers.clear();
+      markers = markerVolta;
+      cameraDinamica = false;
+      mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(
+              locais.first.latitude,
+              locais.first.longitude,
             ),
+            zoom: 15,
           ),
-        );
-      });
-    }
+        ),
+      );
+      attCircle(latLng);
+    });
   }
 
-  Future<void> _rotasProximasVolta(Position pos) async {
+  Future<void> _rotasProximasVolta(LatLng pos) async {
     final markerMult = await markerMulti();
+    final markerDestino = Marker(
+      markerId: MarkerId(pos.toString()),
+      position: LatLng(pos.latitude, pos.longitude),
+      infoWindow: InfoWindow(title: buscaControllerDestino.text),
+      onDrag: (obj) {},
+    );
     var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
     Set<Marker> tempMarker = {};
@@ -574,8 +582,8 @@ class _MapViewState extends State<MapView> {
             Rota rotaTemp = todasRotas
                 .firstWhere((element) => (element.id == rotaTempProx.id));
             setState(() {
-              rotaAtual = rotaTemp;
               montaPolyline(rotaTemp);
+              rotaAtual = rotaTemp;
               visualizaRotas = false;
               mostraRotaAtual = true;
               cameraDinamica = false;
@@ -596,8 +604,8 @@ class _MapViewState extends State<MapView> {
       }
     }
     setState(() {
-      markers.clear();
       tempMarker.add(markerMult);
+      tempMarker.add(markerDestino);
       markers = tempMarker;
     });
   }

@@ -14,12 +14,9 @@ class Firestore {
     return null;
   }
 
-  Future<List<Rota>> todasRotas(bool ida) async {
+  Future<List<Rota>> todasRotas() async {
     List<Rota> rotas = [];
-    var x = await FirebaseFirestore.instance
-        .collection('rotas')
-        .where('ida', isEqualTo: ida)
-        .get();
+    var x = await FirebaseFirestore.instance.collection('rotas').get();
     for (var element in x.docs) {
       rotas.add(Rota.fromMap(element.data()));
     }
