@@ -25,7 +25,7 @@ class _MapViewState extends State<MapView> {
   bool cameraDinamica = true;
   bool mostraRotaAtual = false;
   bool ida = true;
-  bool visualizaRotas = false;
+  bool visualizaRotas = true;
   StreamSubscription<Position>? _currentPosition;
   final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
@@ -48,11 +48,11 @@ class _MapViewState extends State<MapView> {
   String key = 'AIzaSyDZT5coXo6WlxWHoe4iZGLYkg8bq7xK1CM';
   double distanciaParadaUsuario = 0;
   double distanciaParadaBusao = 0;
+  bool mostraLista = false;
 
   @override
   void initState() {
     super.initState();
-    _getRotas();
     _getStremLocation();
   }
 
@@ -90,27 +90,6 @@ class _MapViewState extends State<MapView> {
                     onChanged: (bool value) {
                       setState(() {
                         ida = value;
-                        if (!ida) {
-                          visualizaRotas = ida;
-                        }
-                      });
-                    },
-                  ),
-                ),
-                ListTile(
-                  leading: const Text(
-                    'Exibir todas as rotas',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  trailing: Switch(
-                    inactiveThumbColor: Colors.white,
-                    activeColor: Colors.green,
-                    value: visualizaRotas,
-                    onChanged: (bool value) {
-                      setState(() {
-                        visualizaRotas = value;
                       });
                     },
                   ),
@@ -267,7 +246,9 @@ class _MapViewState extends State<MapView> {
                       scrollDirection: Axis.horizontal,
                       itemCount: todasRotas.length,
                       itemBuilder: (context, index) {
-                        return cardRota(todasRotas[index]);
+                        return Expanded(
+                          child: cardRota(todasRotas[index]),
+                        );
                       },
                     ),
                   )
@@ -367,15 +348,10 @@ class _MapViewState extends State<MapView> {
     return polyline;
   }
 
-  // Atualização stream da localização dos ônibus
-  // Os ônibus são identificados como marcadores
-  _getRotas() async {
-    todasRotas = await Firestore().todasRotas();
-  }
-
   Widget cardRota(Rota rota) {
-    return SizedBox(
-      width: MediaQuery.of(context).size.width * 0.4,
+    return Container(
+      padding: const EdgeInsets.only(right: 10, left: 10),
+      width: MediaQuery.of(context).size.width,
       child: Card(
         shadowColor: Colors.white,
         child: GestureDetector(
@@ -398,7 +374,7 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _rotasProximasIda() async {
-    String distanceMatrix = '';
+    List<Rota> todasRotasTemp = [];
     final markerMult = await markerMulti();
     var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
@@ -409,31 +385,16 @@ class _MapViewState extends State<MapView> {
         raioBuscaMetro / 1000,
         ida);
     for (var i = 0; i < rotasProximas.length; i++) {
+      todasRotasTemp.add(rotasProximas[i]);
       for (var j = 0; j < rotasProximas[i].parada.length; j++) {
         Rota rotaTempProx = rotasProximas[i];
         Marker markTemp = Marker(
           zIndex: i * 10.0 + j,
-          onTap: () async {
-            Rota rotaTemp = todasRotas
-                .firstWhere((element) => (element.id == rotaTempProx.id));
-            Response response = await dio.get(distanceMatrix);
-            setState(() {
-              distanciaParadaBusao = response.data();
-              rotaAtual = rotaTemp;
-              montaPolyline(rotaTemp);
-              visualizaRotas = false;
-              mostraRotaAtual = true;
-              cameraDinamica = false;
-            });
-          },
           markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
           position: LatLng(rotasProximas[i].parada[j].latitude,
               rotasProximas[i].parada[j].longitude),
           infoWindow: InfoWindow(
             title: rotasProximas[i].nome,
-            snippet: rotasProximas[i].parada[j].latitude.toString() +
-                ' | ' +
-                rotasProximas[i].parada[j].longitude.toString(),
           ),
           icon: iconMarkerParada,
         );
@@ -442,6 +403,7 @@ class _MapViewState extends State<MapView> {
     }
     setState(() {
       markers.clear();
+      todasRotas = todasRotasTemp;
       tempMarker.add(markerMult);
       markers = tempMarker;
     });
@@ -614,5 +576,25 @@ class _MapViewState extends State<MapView> {
       tempMarker.add(markerDestino);
       markers = tempMarker;
     });
+  }
+
+  listaDeParadas(Rota rota) {
+    return ListView.builder(
+      itemBuilder: (context, index) {
+        return ListTile(
+          title: Text(
+            rota.parada[index].nome,
+            style: TextStyle(fontSize: 18),
+          ),
+          subtitle: Text(
+            rota.parada[index].latitude.toString() +
+                ' | ' +
+                rota.parada[index].longitude.toString(),
+            style: TextStyle(fontSize: 14),
+          ),
+        );
+      },
+      itemCount: rota.parada.length,
+    );
   }
 }
