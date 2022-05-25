@@ -8,6 +8,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:multirotas/class/Rota.dart';
 import 'package:multirotas/firebase/firestore.dart';
+import 'package:dio/dio.dart';
 
 class MapView extends StatefulWidget {
   const MapView({Key? key}) : super(key: key);
@@ -43,6 +44,10 @@ class _MapViewState extends State<MapView> {
   TextEditingController buscaControllerDestino = TextEditingController();
   bool buscandoDestino = false;
   String queryBuscaDestino = "";
+  Dio dio = Dio();
+  String key = 'AIzaSyDZT5coXo6WlxWHoe4iZGLYkg8bq7xK1CM';
+  double distanciaParadaUsuario = 0;
+  double distanciaParadaBusao = 0;
 
   @override
   void initState() {
@@ -191,7 +196,6 @@ class _MapViewState extends State<MapView> {
                 changeMapMode(mapController);
               },
               markers: Set<Marker>.from(markers),
-              //mapToolbarEnabled: true,
               compassEnabled: true,
               polylines: Set<Polyline>.of(polylines.values),
               initialCameraPosition: _initialLocation,
@@ -200,7 +204,6 @@ class _MapViewState extends State<MapView> {
               mapType: normalMap ? MapType.normal : MapType.satellite,
               zoomGesturesEnabled: true,
               zoomControlsEnabled: false,
-
               circles: circles,
             ),
             Positioned(
@@ -395,6 +398,7 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _rotasProximasIda() async {
+    String distanceMatrix = '';
     final markerMult = await markerMulti();
     var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
@@ -409,10 +413,12 @@ class _MapViewState extends State<MapView> {
         Rota rotaTempProx = rotasProximas[i];
         Marker markTemp = Marker(
           zIndex: i * 10.0 + j,
-          onTap: () {
+          onTap: () async {
             Rota rotaTemp = todasRotas
                 .firstWhere((element) => (element.id == rotaTempProx.id));
+            Response response = await dio.get(distanceMatrix);
             setState(() {
+              distanciaParadaBusao = response.data();
               rotaAtual = rotaTemp;
               montaPolyline(rotaTemp);
               visualizaRotas = false;
