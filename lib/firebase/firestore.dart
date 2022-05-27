@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:multirotas/class/Rota.dart';
+import 'package:multirotas/class/rota.dart';
 import 'package:multirotas/location/haversine.dart';
 
 class Firestore {

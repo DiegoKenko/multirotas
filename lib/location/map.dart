@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:multirotas/class/Rota.dart';
+import 'package:multirotas/class/rota.dart';
 import 'package:multirotas/firebase/firestore.dart';
 import 'package:dio/dio.dart';
+import 'package:multirotas/firebase_options.dart';
+
+import '../class/parada.dart';
 
 class MapView extends StatefulWidget {
   const MapView({Key? key}) : super(key: key);
@@ -26,7 +30,6 @@ class _MapViewState extends State<MapView> {
   bool mostraRotaAtual = false;
   bool ida = true;
   StreamSubscription<Position>? _currentPosition;
-  final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(latMulti, longMult), // Multitécnica
     zoom: 15,
@@ -42,13 +45,6 @@ class _MapViewState extends State<MapView> {
   Set<Circle> circles = {};
   late Rota rotaAtual;
   TextEditingController buscaControllerDestino = TextEditingController();
-  bool buscandoDestino = false;
-  String queryBuscaDestino = "";
-  Dio dio = Dio();
-  String key = 'AIzaSyDZT5coXo6WlxWHoe4iZGLYkg8bq7xK1CM';
-  double distanciaParadaUsuario = 0;
-  double distanciaParadaBusao = 0;
-  bool mostraLista = false;
 
   @override
   void initState() {
@@ -217,7 +213,7 @@ class _MapViewState extends State<MapView> {
                   : Container(),
             ),
             Positioned(
-              top: MediaQuery.of(context).size.height * 0.75,
+              top: MediaQuery.of(context).size.height * 0.7,
               left: MediaQuery.of(context).size.width * 0.75,
               child: ClipOval(
                 child: SizedBox(
@@ -375,6 +371,7 @@ class _MapViewState extends State<MapView> {
           polylines.clear();
           if (ida || rota.parada.isNotEmpty) {
             showModalBottomSheet(
+              enableDrag: true,
               context: context,
               builder: (builder) {
                 return SizedBox(
@@ -383,51 +380,68 @@ class _MapViewState extends State<MapView> {
                     scrollDirection: Axis.vertical,
                     itemBuilder: (context, index) {
                       return FutureBuilder(
-                          future: placemarkFromCoordinates(
-                              rota.parada[index].latitude,
-                              rota.parada[index].longitude),
-                          builder: (context, AsyncSnapshot asyncSnapshot) {
+                          future: detalhesParada(
+                            rota,
+                            index,
+                            LatLng(
+                              _initialLocation.target.latitude - 0.1,
+                              _initialLocation.target.longitude - 0.1,
+                            ),
+                            LatLng(
+                              _initialLocation.target.latitude,
+                              _initialLocation.target.longitude,
+                            ),
+                          ),
+                          builder:
+                              (context, AsyncSnapshot<Parada> asyncSnapshot) {
                             if (asyncSnapshot.hasData) {
                               return Container(
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(60),
-                                  border: Border(
-                                    top: BorderSide(
-                                      color: Colors.grey,
-                                      width: 6,
-                                    ),
-                                  ),
+                                  borderRadius: BorderRadius.circular(40),
                                 ),
-                                child: ListTile(
-                                  tileColor: const Color(0xFF373D69),
-                                  onTap: () {
-                                    cameraDinamica = false;
-                                    mapController.animateCamera(
-                                      CameraUpdate.newCameraPosition(
-                                        CameraPosition(
-                                          target: LatLng(
-                                            rota.parada[index].latitude,
-                                            rota.parada[index].longitude,
-                                          ),
-                                          zoom: 17,
-                                        ),
-                                      ),
-                                    );
-                                    montaPolyline(
-                                      todasRotas.firstWhere(
-                                        (element) => (element.id == rota.id),
-                                      ),
-                                    );
-                                    Navigator.pop(context);
-                                  },
-                                  title: Text(
-                                    asyncSnapshot.data.first.thoroughfare +
-                                        ' - ' +
-                                        asyncSnapshot
-                                            .data.first.subThoroughfare,
-                                    style: const TextStyle(
-                                      color: Color(0xFF57C0A4),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: 10,
+                                    left: 2,
+                                    right: 2,
+                                  ),
+                                  child: ListTile(
+                                    title: Text(''),
+                                    subtitle: Text(
+                                      asyncSnapshot.data!.thoroughfare! +
+                                          ' - ' +
+                                          asyncSnapshot.data!.subThoroughfare!,
                                     ),
+                                    trailing: IconButton(
+                                        icon: const Icon(
+                                          Icons.navigation_rounded,
+                                          size: 30,
+                                          color:
+                                              Color.fromARGB(234, 55, 61, 105),
+                                        ),
+                                        onPressed: () {}),
+                                    tileColor:
+                                        const Color.fromARGB(66, 55, 61, 105),
+                                    onTap: () {
+                                      cameraDinamica = false;
+                                      mapController.animateCamera(
+                                        CameraUpdate.newCameraPosition(
+                                          CameraPosition(
+                                            target: LatLng(
+                                              rota.parada[index].latitude,
+                                              rota.parada[index].longitude,
+                                            ),
+                                            zoom: 17,
+                                          ),
+                                        ),
+                                      );
+                                      montaPolyline(
+                                        todasRotas.firstWhere(
+                                          (element) => (element.id == rota.id),
+                                        ),
+                                      );
+                                      Navigator.pop(context);
+                                    },
                                   ),
                                 ),
                               );
@@ -662,17 +676,55 @@ class _MapViewState extends State<MapView> {
         return ListTile(
           title: Text(
             rota.parada[index].nome,
-            style: TextStyle(fontSize: 18),
+            style: const TextStyle(fontSize: 18),
           ),
           subtitle: Text(
             rota.parada[index].latitude.toString() +
                 ' | ' +
                 rota.parada[index].longitude.toString(),
-            style: TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 14),
           ),
         );
       },
       itemCount: rota.parada.length,
     );
+  }
+
+  Future<Parada> detalhesParada(
+      Rota rota, int index, LatLng posBusao, LatLng posUsuario) async {
+    double latParada = rota.parada[index].latitude;
+    double longParada = rota.parada[index].longitude;
+    Parada parada = Parada();
+    List<Placemark> lugares =
+        await placemarkFromCoordinates(latParada, longParada);
+    parada.thoroughfare = lugares.first.thoroughfare;
+    parada.subThoroughfare = lugares.first.subThoroughfare;
+    // Do usuário até a parada
+    var retUsu = await Dio().get(
+        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
+            posUsuario.latitude.toString() +
+            ',' +
+            posUsuario.longitude.toString() +
+            '&origins=' +
+            latParada.toString() +
+            ',' +
+            longParada.toString() +
+            '&key=' +
+            DefaultFirebaseOptions.android.apiKey +
+            '');
+    // Do busão até a parada
+    var retBus = await Dio().get(
+        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
+            posBusao.latitude.toString() +
+            ',' +
+            posBusao.longitude.toString() +
+            '&origins=' +
+            latParada.toString() +
+            ',' +
+            longParada.toString() +
+            '&key=' +
+            DefaultFirebaseOptions.android.apiKey +
+            '');
+    return parada;
   }
 }
