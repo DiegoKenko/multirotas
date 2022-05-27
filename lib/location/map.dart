@@ -25,7 +25,6 @@ class _MapViewState extends State<MapView> {
   bool cameraDinamica = true;
   bool mostraRotaAtual = false;
   bool ida = true;
-  bool visualizaRotas = true;
   StreamSubscription<Position>? _currentPosition;
   final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
@@ -37,6 +36,7 @@ class _MapViewState extends State<MapView> {
   final startAddressController = TextEditingController();
   Map<PolylineId, Polyline> polylines = {};
   List todasRotas = [];
+  List todasRotasProximas = [];
   List rotasProximas = [];
   Set<Marker> markers = {};
   Set<Circle> circles = {};
@@ -54,6 +54,8 @@ class _MapViewState extends State<MapView> {
   void initState() {
     super.initState();
     _getStremLocation();
+    // Deve ser executado depois do _getStremLocation
+    getRotas();
   }
 
   @override
@@ -236,7 +238,7 @@ class _MapViewState extends State<MapView> {
                 ),
               ),
             ),
-            visualizaRotas
+            ida
                 ? Positioned.fill(
                     bottom: 0,
                     top: MediaQuery.of(context).size.height * 0.8,
@@ -244,11 +246,9 @@ class _MapViewState extends State<MapView> {
                     right: 0,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: todasRotas.length,
+                      itemCount: todasRotasProximas.length,
                       itemBuilder: (context, index) {
-                        return Expanded(
-                          child: cardRota(todasRotas[index]),
-                        );
+                        return cardRota(todasRotasProximas[index]);
                       },
                     ),
                   )
@@ -257,6 +257,10 @@ class _MapViewState extends State<MapView> {
         ),
       ),
     );
+  }
+
+  getRotas() async {
+    todasRotas = await Firestore().todasRotas();
   }
 
   // Atualização da localização como stream.
@@ -350,25 +354,95 @@ class _MapViewState extends State<MapView> {
 
   Widget cardRota(Rota rota) {
     return Container(
+      color: Colors.transparent,
       padding: const EdgeInsets.only(right: 10, left: 10),
-      width: MediaQuery.of(context).size.width,
-      child: Card(
-        shadowColor: Colors.white,
-        child: GestureDetector(
-          onTap: () {
-            polylines.clear();
-            montaPolyline(rota);
-          },
+      width: MediaQuery.of(context).size.width * 0.7,
+      child: GestureDetector(
+        child: Card(
           child: Center(
-              child: Text(
-            rota.nome,
-            style: const TextStyle(
-              color: Colors.white,
-              letterSpacing: 2,
+            child: Text(
+              rota.nome,
+              style: const TextStyle(
+                color: Colors.white,
+                letterSpacing: 2,
+              ),
             ),
-          )),
+          ),
+          shadowColor: Colors.white,
+          color: const Color(0xFF373D69),
         ),
-        color: const Color(0xFF373D69),
+        onTap: () {
+          polylines.clear();
+          if (ida || rota.parada.isNotEmpty) {
+            showModalBottomSheet(
+              context: context,
+              builder: (builder) {
+                return SizedBox(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    scrollDirection: Axis.vertical,
+                    itemBuilder: (context, index) {
+                      return FutureBuilder(
+                          future: placemarkFromCoordinates(
+                              rota.parada[index].latitude,
+                              rota.parada[index].longitude),
+                          builder: (context, AsyncSnapshot asyncSnapshot) {
+                            if (asyncSnapshot.hasData) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(60),
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: Colors.grey,
+                                      width: 6,
+                                    ),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  tileColor: const Color(0xFF373D69),
+                                  onTap: () {
+                                    cameraDinamica = false;
+                                    mapController.animateCamera(
+                                      CameraUpdate.newCameraPosition(
+                                        CameraPosition(
+                                          target: LatLng(
+                                            rota.parada[index].latitude,
+                                            rota.parada[index].longitude,
+                                          ),
+                                          zoom: 17,
+                                        ),
+                                      ),
+                                    );
+                                    montaPolyline(
+                                      todasRotas.firstWhere(
+                                        (element) => (element.id == rota.id),
+                                      ),
+                                    );
+                                    Navigator.pop(context);
+                                  },
+                                  title: Text(
+                                    asyncSnapshot.data.first.thoroughfare +
+                                        ' - ' +
+                                        asyncSnapshot
+                                            .data.first.subThoroughfare,
+                                    style: const TextStyle(
+                                      color: Color(0xFF57C0A4),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              return Container();
+                            }
+                          });
+                    },
+                    itemCount: rota.parada.length,
+                  ),
+                );
+              },
+            );
+          }
+        },
       ),
     );
   }
@@ -390,20 +464,25 @@ class _MapViewState extends State<MapView> {
         Rota rotaTempProx = rotasProximas[i];
         Marker markTemp = Marker(
           zIndex: i * 10.0 + j,
+          onTap: () {
+            setState(() {
+              cameraDinamica = false;
+            });
+          },
           markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
           position: LatLng(rotasProximas[i].parada[j].latitude,
               rotasProximas[i].parada[j].longitude),
+          icon: iconMarkerParada,
           infoWindow: InfoWindow(
             title: rotasProximas[i].nome,
           ),
-          icon: iconMarkerParada,
         );
         tempMarker.add(markTemp);
       }
     }
     setState(() {
       markers.clear();
-      todasRotas = todasRotasTemp;
+      todasRotasProximas = todasRotasTemp;
       tempMarker.add(markerMult);
       markers = tempMarker;
     });
@@ -552,7 +631,6 @@ class _MapViewState extends State<MapView> {
             setState(() {
               montaPolyline(rotaTemp);
               rotaAtual = rotaTemp;
-              visualizaRotas = false;
               mostraRotaAtual = true;
               cameraDinamica = false;
             });
