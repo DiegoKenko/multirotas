@@ -3,10 +3,12 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:multirotas/class/Rota.dart';
 import 'package:multirotas/firebase/firestore.dart';
+import 'package:dio/dio.dart';
 
 class MapView extends StatefulWidget {
   const MapView({Key? key}) : super(key: key);
@@ -23,7 +25,6 @@ class _MapViewState extends State<MapView> {
   bool cameraDinamica = true;
   bool mostraRotaAtual = false;
   bool ida = true;
-  bool visualizaRotas = false;
   StreamSubscription<Position>? _currentPosition;
   final Geolocator geo = Geolocator();
   CameraPosition _initialLocation = const CameraPosition(
@@ -35,16 +36,26 @@ class _MapViewState extends State<MapView> {
   final startAddressController = TextEditingController();
   Map<PolylineId, Polyline> polylines = {};
   List todasRotas = [];
+  List todasRotasProximas = [];
   List rotasProximas = [];
   Set<Marker> markers = {};
   Set<Circle> circles = {};
   late Rota rotaAtual;
+  TextEditingController buscaControllerDestino = TextEditingController();
+  bool buscandoDestino = false;
+  String queryBuscaDestino = "";
+  Dio dio = Dio();
+  String key = 'AIzaSyDZT5coXo6WlxWHoe4iZGLYkg8bq7xK1CM';
+  double distanciaParadaUsuario = 0;
+  double distanciaParadaBusao = 0;
+  bool mostraLista = false;
 
   @override
   void initState() {
     super.initState();
-    _getRotas();
     _getStremLocation();
+    // Deve ser executado depois do _getStremLocation
+    getRotas();
   }
 
   @override
@@ -81,27 +92,6 @@ class _MapViewState extends State<MapView> {
                     onChanged: (bool value) {
                       setState(() {
                         ida = value;
-                        if (!ida) {
-                          visualizaRotas = ida;
-                        }
-                      });
-                    },
-                  ),
-                ),
-                ListTile(
-                  leading: const Text(
-                    'Exibir todas as rotas',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  trailing: Switch(
-                    inactiveThumbColor: Colors.white,
-                    activeColor: Colors.green,
-                    value: visualizaRotas,
-                    onChanged: (bool value) {
-                      setState(() {
-                        visualizaRotas = value;
                       });
                     },
                   ),
@@ -159,6 +149,24 @@ class _MapViewState extends State<MapView> {
         ),
         appBar: AppBar(
           backgroundColor: Colors.transparent,
+          title: ida
+              ? Container()
+              : Center(
+                  child: TextField(
+                    controller: buscaControllerDestino,
+                    decoration: InputDecoration(
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.search),
+                        onPressed: () {
+                          FocusScope.of(context).unfocus(); // esconder teclado
+                          buscaRotaPorEndereco();
+                        },
+                      ),
+                      hintText: 'destino...',
+                    ),
+                  ),
+                ),
+          actions: const [],
         ),
         body: Stack(
           alignment: AlignmentDirectional.bottomEnd,
@@ -169,7 +177,6 @@ class _MapViewState extends State<MapView> {
                 changeMapMode(mapController);
               },
               markers: Set<Marker>.from(markers),
-              //mapToolbarEnabled: true,
               compassEnabled: true,
               polylines: Set<Polyline>.of(polylines.values),
               initialCameraPosition: _initialLocation,
@@ -178,7 +185,6 @@ class _MapViewState extends State<MapView> {
               mapType: normalMap ? MapType.normal : MapType.satellite,
               zoomGesturesEnabled: true,
               zoomControlsEnabled: false,
-
               circles: circles,
             ),
             Positioned(
@@ -232,7 +238,7 @@ class _MapViewState extends State<MapView> {
                 ),
               ),
             ),
-            visualizaRotas
+            ida
                 ? Positioned.fill(
                     bottom: 0,
                     top: MediaQuery.of(context).size.height * 0.8,
@@ -240,9 +246,9 @@ class _MapViewState extends State<MapView> {
                     right: 0,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      itemCount: todasRotas.length,
+                      itemCount: todasRotasProximas.length,
                       itemBuilder: (context, index) {
-                        return cardRota(todasRotas[index]);
+                        return cardRota(todasRotasProximas[index]);
                       },
                     ),
                   )
@@ -251,6 +257,10 @@ class _MapViewState extends State<MapView> {
         ),
       ),
     );
+  }
+
+  getRotas() async {
+    todasRotas = await Firestore().todasRotas();
   }
 
   // Atualização da localização como stream.
@@ -278,8 +288,13 @@ class _MapViewState extends State<MapView> {
           ),
         );
       }
-      _rotasProximas();
-      attCircle();
+      if (ida) {
+        _rotasProximasIda();
+        setState(() {
+          attCircle(LatLng(_initialLocation.target.latitude,
+              _initialLocation.target.longitude));
+        });
+      }
     });
   }
 
@@ -337,83 +352,143 @@ class _MapViewState extends State<MapView> {
     return polyline;
   }
 
-  // Atualização stream da localização dos ônibus
-  // Os ônibus são identificados como marcadores
-  _getRotas() async {
-    todasRotas = await Firestore().todasRotas();
-  }
-
   Widget cardRota(Rota rota) {
-    return SizedBox(
-      width: MediaQuery.of(context).size.width * 0.4,
-      child: Card(
-        shadowColor: Colors.white,
-        child: GestureDetector(
-          onTap: () {
-            polylines.clear();
-            montaPolyline(rota);
-          },
+    return Container(
+      color: Colors.transparent,
+      padding: const EdgeInsets.only(right: 10, left: 10),
+      width: MediaQuery.of(context).size.width * 0.7,
+      child: GestureDetector(
+        child: Card(
           child: Center(
-              child: Text(
-            rota.nome,
-            style: const TextStyle(
-              color: Colors.white,
-              letterSpacing: 2,
+            child: Text(
+              rota.nome,
+              style: const TextStyle(
+                color: Colors.white,
+                letterSpacing: 2,
+              ),
             ),
-          )),
+          ),
+          shadowColor: Colors.white,
+          color: const Color(0xFF373D69),
         ),
-        color: const Color(0xFF373D69),
+        onTap: () {
+          polylines.clear();
+          if (ida || rota.parada.isNotEmpty) {
+            showModalBottomSheet(
+              context: context,
+              builder: (builder) {
+                return SizedBox(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    scrollDirection: Axis.vertical,
+                    itemBuilder: (context, index) {
+                      return FutureBuilder(
+                          future: placemarkFromCoordinates(
+                              rota.parada[index].latitude,
+                              rota.parada[index].longitude),
+                          builder: (context, AsyncSnapshot asyncSnapshot) {
+                            if (asyncSnapshot.hasData) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(60),
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: Colors.grey,
+                                      width: 6,
+                                    ),
+                                  ),
+                                ),
+                                child: ListTile(
+                                  tileColor: const Color(0xFF373D69),
+                                  onTap: () {
+                                    cameraDinamica = false;
+                                    mapController.animateCamera(
+                                      CameraUpdate.newCameraPosition(
+                                        CameraPosition(
+                                          target: LatLng(
+                                            rota.parada[index].latitude,
+                                            rota.parada[index].longitude,
+                                          ),
+                                          zoom: 17,
+                                        ),
+                                      ),
+                                    );
+                                    montaPolyline(
+                                      todasRotas.firstWhere(
+                                        (element) => (element.id == rota.id),
+                                      ),
+                                    );
+                                    Navigator.pop(context);
+                                  },
+                                  title: Text(
+                                    asyncSnapshot.data.first.thoroughfare +
+                                        ' - ' +
+                                        asyncSnapshot
+                                            .data.first.subThoroughfare,
+                                    style: const TextStyle(
+                                      color: Color(0xFF57C0A4),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            } else {
+                              return Container();
+                            }
+                          });
+                    },
+                    itemCount: rota.parada.length,
+                  ),
+                );
+              },
+            );
+          }
+        },
       ),
     );
   }
 
-  Future<void> _rotasProximas() async {
-    var markerMulti = await markerMulit();
+  Future<void> _rotasProximasIda() async {
+    List<Rota> todasRotasTemp = [];
+    final markerMult = await markerMulti();
     var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
     Set<Marker> tempMarker = {};
     List<Rota> rotasProximas = await Firestore().rotasProximas(
         double.parse(_initialLocation.target.latitude.toString()),
         double.parse(_initialLocation.target.longitude.toString()),
-        raioBuscaMetro / 1000);
+        raioBuscaMetro / 1000,
+        ida);
     for (var i = 0; i < rotasProximas.length; i++) {
+      todasRotasTemp.add(rotasProximas[i]);
       for (var j = 0; j < rotasProximas[i].parada.length; j++) {
         Rota rotaTempProx = rotasProximas[i];
         Marker markTemp = Marker(
           zIndex: i * 10.0 + j,
           onTap: () {
-            Rota rotaTemp = todasRotas
-                .firstWhere((element) => (element.id == rotaTempProx.id));
             setState(() {
-              rotaAtual = rotaTemp;
-              montaPolyline(rotaTemp);
-              visualizaRotas = false;
-              mostraRotaAtual = true;
               cameraDinamica = false;
             });
           },
           markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
           position: LatLng(rotasProximas[i].parada[j].latitude,
               rotasProximas[i].parada[j].longitude),
+          icon: iconMarkerParada,
           infoWindow: InfoWindow(
             title: rotasProximas[i].nome,
-            snippet: rotasProximas[i].parada[j].latitude.toString() +
-                ' | ' +
-                rotasProximas[i].parada[j].longitude.toString(),
           ),
-          icon: iconMarkerParada,
         );
         tempMarker.add(markTemp);
       }
     }
     setState(() {
       markers.clear();
-      tempMarker.add(markerMulti);
+      todasRotasProximas = todasRotasTemp;
+      tempMarker.add(markerMult);
       markers = tempMarker;
     });
   }
 
-  Future<Marker> markerMulit() async {
+  Future<Marker> markerMulti() async {
     var iconMarkerMulti = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/mtMap.png");
     return Marker(
@@ -426,19 +501,16 @@ class _MapViewState extends State<MapView> {
     );
   }
 
-  attCircle() {
-    setState(() {
-      circles = {
-        Circle(
-          fillColor: const Color.fromARGB(43, 94, 125, 212),
-          strokeColor: const Color.fromRGBO(148, 169, 229, 0.2),
-          circleId: const CircleId('id'),
-          center: LatLng(_initialLocation.target.latitude,
-              _initialLocation.target.longitude),
-          radius: raioBuscaMetro,
-        )
-      };
-    });
+  attCircle(LatLng latLng) {
+    circles = {
+      Circle(
+        fillColor: const Color.fromARGB(43, 94, 125, 212),
+        strokeColor: const Color.fromRGBO(148, 169, 229, 0.2),
+        circleId: const CircleId('id'),
+        center: LatLng(latLng.latitude, latLng.longitude),
+        radius: raioBuscaMetro,
+      )
+    };
   }
 
   montaPolyline(Rota rota) {
@@ -488,5 +560,119 @@ class _MapViewState extends State<MapView> {
     ByteData byte = await rootBundle.load(path);
     var list = byte.buffer.asUint8List(byte.offsetInBytes, byte.lengthInBytes);
     return utf8.decode(list);
+  }
+
+  // Busca as rotas mais próxima dentro do raio do endereço(lat long) passado
+  buscaRotaPorEndereco() async {
+    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
+    int counter = 0;
+    Set<Marker> markerVolta = {};
+    // adiciona 'sete lagoas' na busca do endereço
+    String endereco = buscaControllerDestino.text + 'sete lagoas';
+    List<Location> locais =
+        await locationFromAddress(endereco, localeIdentifier: 'pt_BR');
+
+    // para cada local encontrado, deve-se adicionar um marcador, ao clicar no marcador, apresentará as rotas próximas.
+    var latLng = LatLng(locais.first.latitude, locais.first.longitude);
+    _rotasProximasVolta(latLng);
+    counter++;
+    markerVolta.add(Marker(
+      markerId: MarkerId(counter.toString()),
+      position: LatLng(locais.first.latitude, locais.first.longitude),
+      infoWindow: InfoWindow(title: buscaControllerDestino.text),
+      onDrag: (obj) {},
+      icon: iconMarkerParada,
+    ));
+
+    setState(() {
+      markers.clear();
+      markers = markerVolta;
+      cameraDinamica = false;
+      mapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: LatLng(
+              locais.first.latitude,
+              locais.first.longitude,
+            ),
+            zoom: 15,
+          ),
+        ),
+      );
+      attCircle(latLng);
+    });
+  }
+
+  Future<void> _rotasProximasVolta(LatLng pos) async {
+    final markerMult = await markerMulti();
+    final markerDestino = Marker(
+      markerId: MarkerId(pos.toString()),
+      position: LatLng(pos.latitude, pos.longitude),
+      infoWindow: InfoWindow(title: buscaControllerDestino.text),
+      onDrag: (obj) {},
+    );
+    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
+    Set<Marker> tempMarker = {};
+    List<Rota> rotasProximas = await Firestore().rotasProximas(
+        double.parse(pos.latitude.toString()),
+        double.parse(pos.longitude.toString()),
+        raioBuscaMetro / 1000,
+        ida);
+    for (var i = 0; i < rotasProximas.length; i++) {
+      for (var j = 0; j < rotasProximas[i].parada.length; j++) {
+        Rota rotaTempProx = rotasProximas[i];
+        Marker markTemp = Marker(
+          zIndex: i * 10.0 + j,
+          onTap: () {
+            Rota rotaTemp = todasRotas
+                .firstWhere((element) => (element.id == rotaTempProx.id));
+            setState(() {
+              montaPolyline(rotaTemp);
+              rotaAtual = rotaTemp;
+              mostraRotaAtual = true;
+              cameraDinamica = false;
+            });
+          },
+          markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
+          position: LatLng(rotasProximas[i].parada[j].latitude,
+              rotasProximas[i].parada[j].longitude),
+          infoWindow: InfoWindow(
+            title: rotasProximas[i].nome,
+            snippet: rotasProximas[i].parada[j].latitude.toString() +
+                ' | ' +
+                rotasProximas[i].parada[j].longitude.toString(),
+          ),
+          icon: iconMarkerParada,
+        );
+        tempMarker.add(markTemp);
+      }
+    }
+    setState(() {
+      tempMarker.add(markerMult);
+      tempMarker.add(markerDestino);
+      markers = tempMarker;
+    });
+  }
+
+  listaDeParadas(Rota rota) {
+    return ListView.builder(
+      itemBuilder: (context, index) {
+        return ListTile(
+          title: Text(
+            rota.parada[index].nome,
+            style: TextStyle(fontSize: 18),
+          ),
+          subtitle: Text(
+            rota.parada[index].latitude.toString() +
+                ' | ' +
+                rota.parada[index].longitude.toString(),
+            style: TextStyle(fontSize: 14),
+          ),
+        );
+      },
+      itemCount: rota.parada.length,
+    );
   }
 }
