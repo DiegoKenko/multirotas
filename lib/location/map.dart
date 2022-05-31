@@ -248,7 +248,7 @@ class _MapViewState extends State<MapView> {
                       },
                     ),
                   )
-                : Container()
+                : Container(),
           ],
         ),
       ),
@@ -308,7 +308,7 @@ class _MapViewState extends State<MapView> {
 
     // Generating the list of coordinates to be used for drawing the polylines
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      'AIzaSyC-cAQ95icIXxAelzKYLjwVVDCw-KFmuBw', // Google Maps API Key
+      DefaultFirebaseOptions.android.apiKey, // Google Maps API Key
       PointLatLng(
         startLatitude,
         startLongitude,
@@ -370,90 +370,10 @@ class _MapViewState extends State<MapView> {
         onTap: () {
           polylines.clear();
           if (ida || rota.parada.isNotEmpty) {
-            showModalBottomSheet(
-              enableDrag: true,
-              context: context,
-              builder: (builder) {
-                return SizedBox(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    scrollDirection: Axis.vertical,
-                    itemBuilder: (context, index) {
-                      return FutureBuilder(
-                          future: detalhesParada(
-                            rota,
-                            index,
-                            LatLng(
-                              _initialLocation.target.latitude - 0.1,
-                              _initialLocation.target.longitude - 0.1,
-                            ),
-                            LatLng(
-                              _initialLocation.target.latitude,
-                              _initialLocation.target.longitude,
-                            ),
-                          ),
-                          builder:
-                              (context, AsyncSnapshot<Parada> asyncSnapshot) {
-                            if (asyncSnapshot.hasData) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(40),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: 10,
-                                    left: 2,
-                                    right: 2,
-                                  ),
-                                  child: ListTile(
-                                    title: Text(''),
-                                    subtitle: Text(
-                                      asyncSnapshot.data!.thoroughfare! +
-                                          ' - ' +
-                                          asyncSnapshot.data!.subThoroughfare!,
-                                    ),
-                                    trailing: IconButton(
-                                        icon: const Icon(
-                                          Icons.navigation_rounded,
-                                          size: 30,
-                                          color:
-                                              Color.fromARGB(234, 55, 61, 105),
-                                        ),
-                                        onPressed: () {}),
-                                    tileColor:
-                                        const Color.fromARGB(66, 55, 61, 105),
-                                    onTap: () {
-                                      cameraDinamica = false;
-                                      mapController.animateCamera(
-                                        CameraUpdate.newCameraPosition(
-                                          CameraPosition(
-                                            target: LatLng(
-                                              rota.parada[index].latitude,
-                                              rota.parada[index].longitude,
-                                            ),
-                                            zoom: 17,
-                                          ),
-                                        ),
-                                      );
-                                      montaPolyline(
-                                        todasRotas.firstWhere(
-                                          (element) => (element.id == rota.id),
-                                        ),
-                                      );
-                                      Navigator.pop(context);
-                                    },
-                                  ),
-                                ),
-                              );
-                            } else {
-                              return Container();
-                            }
-                          });
-                    },
-                    itemCount: rota.parada.length,
-                  ),
-                );
-              },
+            montaPolyline(
+              todasRotas.firstWhere(
+                (element) => (element.id == rota.id),
+              ),
             );
           }
         },
@@ -463,10 +383,7 @@ class _MapViewState extends State<MapView> {
 
   Future<void> _rotasProximasIda() async {
     List<Rota> todasRotasTemp = [];
-    final markerMult = await markerMulti();
-    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
-    Set<Marker> tempMarker = {};
+
     List<Rota> rotasProximas = await Firestore().rotasProximas(
         double.parse(_initialLocation.target.latitude.toString()),
         double.parse(_initialLocation.target.longitude.toString()),
@@ -474,31 +391,9 @@ class _MapViewState extends State<MapView> {
         ida);
     for (var i = 0; i < rotasProximas.length; i++) {
       todasRotasTemp.add(rotasProximas[i]);
-      for (var j = 0; j < rotasProximas[i].parada.length; j++) {
-        Rota rotaTempProx = rotasProximas[i];
-        Marker markTemp = Marker(
-          zIndex: i * 10.0 + j,
-          onTap: () {
-            setState(() {
-              cameraDinamica = false;
-            });
-          },
-          markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
-          position: LatLng(rotasProximas[i].parada[j].latitude,
-              rotasProximas[i].parada[j].longitude),
-          icon: iconMarkerParada,
-          infoWindow: InfoWindow(
-            title: rotasProximas[i].nome,
-          ),
-        );
-        tempMarker.add(markTemp);
-      }
     }
     setState(() {
-      markers.clear();
       todasRotasProximas = todasRotasTemp;
-      tempMarker.add(markerMult);
-      markers = tempMarker;
     });
   }
 
@@ -691,7 +586,13 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<Parada> detalhesParada(
-      Rota rota, int index, LatLng posBusao, LatLng posUsuario) async {
+    Rota rota,
+    int index,
+    LatLng posBusao,
+    LatLng posUsuario,
+  ) async {
+    String travelModeBusao = "DRIVING";
+    String travelModeUsuario = "WALKING";
     double latParada = rota.parada[index].latitude;
     double longParada = rota.parada[index].longitude;
     Parada parada = Parada();
@@ -711,7 +612,10 @@ class _MapViewState extends State<MapView> {
             longParada.toString() +
             '&key=' +
             DefaultFirebaseOptions.android.apiKey +
-            '');
+            '&mode=' +
+            travelModeUsuario +
+            '&language=pt-BR');
+
     // Do busão até a parada
     var retBus = await Dio().get(
         'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
@@ -724,7 +628,13 @@ class _MapViewState extends State<MapView> {
             longParada.toString() +
             '&key=' +
             DefaultFirebaseOptions.android.apiKey +
-            '');
+            '&mode=' +
+            travelModeBusao +
+            '&language=pt-BR');
+    parada.tempoChegadaUsuario =
+        retUsu.data['rows'].first['elements'].first['duration']['text'];
+    parada.tempoChegadaBusao =
+        retBus.data['rows'].first['elements'].first['duration']['text'];
     return parada;
   }
 }

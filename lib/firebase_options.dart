@@ -40,7 +40,7 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDZT5coXo6WlxWHoe4iZGLYkg8bq7xK1CM',
+    apiKey: 'AIzaSyBUOHpNvUgNO64PxQcSzZzd4kLLq_qjdoU',
     appId: '1:519420295610:android:709f49230ad3fce96b4583',
     messagingSenderId: '519420295610',
     projectId: 'multirotas-b3006',
@@ -55,7 +55,8 @@ class DefaultFirebaseOptions {
     projectId: 'multirotas-b3006',
     databaseURL: 'https://multirotas-b3006-default-rtdb.firebaseio.com',
     storageBucket: 'multirotas-b3006.appspot.com',
-    iosClientId: '519420295610-09c5jriksmsimc1t4q2rdcma48nkbne0.apps.googleusercontent.com',
+    iosClientId:
+        '519420295610-09c5jriksmsimc1t4q2rdcma48nkbne0.apps.googleusercontent.com',
     iosBundleId: 'com.example.multirotas',
   );
 }
