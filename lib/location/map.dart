@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
@@ -11,6 +10,7 @@ import 'package:multirotas/class/rota.dart';
 import 'package:multirotas/firebase/firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:multirotas/firebase_options.dart';
+import 'package:multirotas/location/haversine.dart';
 
 import '../class/parada.dart';
 
@@ -24,15 +24,16 @@ class MapView extends StatefulWidget {
 class _MapViewState extends State<MapView> {
   static const double latMulti = -19.49392296505924;
   static const double longMult = -44.30632263820034;
-  double raioBuscaMetro = 1000;
+  double raioBuscaMetro = 600;
   bool normalMap = true;
-  bool cameraDinamica = true;
+  bool cameraDinamica = false;
   bool mostraRotaAtual = false;
   bool ida = true;
+  bool mapTapAllowed = false;
   StreamSubscription<Position>? _currentPosition;
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(latMulti, longMult), // Multitécnica
-    zoom: 15,
+    zoom: 16,
   );
   late GoogleMapController mapController;
   late PolylinePoints polylinePoints;
@@ -58,6 +59,7 @@ class _MapViewState extends State<MapView> {
   void dispose() {
     _currentPosition?.cancel();
     _currentPosition = null;
+    mapController.dispose();
     super.dispose();
   }
 
@@ -168,9 +170,34 @@ class _MapViewState extends State<MapView> {
           alignment: AlignmentDirectional.bottomEnd,
           children: [
             GoogleMap(
+              onCameraMove: (position) {
+                setState(() {
+                  cameraDinamica = false;
+                });
+              },
               onMapCreated: (GoogleMapController controller) {
                 mapController = controller;
                 changeMapMode(mapController);
+              },
+              onTap: (pos) async {
+                if (mapTapAllowed) {
+                  Marker markerM = await markerMulti();
+                  LatLng? paradaLatLng = await buscaParadaProxima(pos);
+                  setState(
+                    () {
+                      markers.clear();
+                      markers.add(markerM);
+                      markers.add(Marker(
+                          markerId: const MarkerId("nearestMarker"),
+                          position: paradaLatLng!,
+                          infoWindow: const InfoWindow(
+                            title: "Parada mais próxima",
+                            snippet: "",
+                          ),
+                          icon: BitmapDescriptor.defaultMarker));
+                    },
+                  );
+                }
               },
               markers: Set<Marker>.from(markers),
               compassEnabled: true,
@@ -192,10 +219,12 @@ class _MapViewState extends State<MapView> {
                   ? Container(
                       child: ListTile(
                         title: Center(
-                          child: Text(
-                            rotaAtual.nome,
-                            style: const TextStyle(fontSize: 30),
-                          ),
+                          child: mapTapAllowed
+                              ? Text(
+                                  rotaAtual.nome,
+                                  style: const TextStyle(fontSize: 30),
+                                )
+                              : const Text(''),
                         ),
                         trailing: IconButton(
                           onPressed: () {
@@ -219,14 +248,16 @@ class _MapViewState extends State<MapView> {
                 child: SizedBox(
                   child: IconButton(
                     icon: Icon(
-                      Icons.navigation,
+                      Icons.my_location,
                       color: cameraDinamica
                           ? const Color(0xFF57C0A4)
                           : Colors.grey,
                       size: 50,
                     ),
                     onPressed: () {
-                      cameraDinamica = !cameraDinamica;
+                      setState(() {
+                        cameraDinamica = !cameraDinamica;
+                      });
                     },
                   ),
                   height: 70,
@@ -279,7 +310,7 @@ class _MapViewState extends State<MapView> {
                 _initialLocation.target.latitude,
                 _initialLocation.target.longitude,
               ),
-              zoom: 15,
+              zoom: 16,
             ),
           ),
         );
@@ -369,12 +400,13 @@ class _MapViewState extends State<MapView> {
         ),
         onTap: () {
           polylines.clear();
+          markers.clear();
           if (ida || rota.parada.isNotEmpty) {
-            montaPolyline(
-              todasRotas.firstWhere(
-                (element) => (element.id == rota.id),
-              ),
+            mapTapAllowed = true;
+            rotaAtual = todasRotas.firstWhere(
+              (element) => (element.id == rota.id),
             );
+            montaPolyline(rotaAtual);
           }
         },
       ),
@@ -505,7 +537,7 @@ class _MapViewState extends State<MapView> {
               locais.first.latitude,
               locais.first.longitude,
             ),
-            zoom: 15,
+            zoom: 16,
           ),
         ),
       );
@@ -636,5 +668,28 @@ class _MapViewState extends State<MapView> {
     parada.tempoChegadaBusao =
         retBus.data['rows'].first['elements'].first['duration']['text'];
     return parada;
+  }
+
+  Future<LatLng?> buscaParadaProxima(LatLng pos) async {
+    double distanciaMin = 100000;
+    double distanciaHaversine = 0;
+    LatLng? markerPosition;
+    // Busca a parada mais próxima da rota atual.
+    for (var i = 0; i < rotaAtual.parada.length - 1; i++) {
+      distanciaHaversine = Haversine.haversine(
+        pos.latitude,
+        pos.longitude,
+        rotaAtual.parada[i].latitude,
+        rotaAtual.parada[i].longitude,
+      );
+      if (distanciaHaversine < distanciaMin) {
+        distanciaMin = distanciaHaversine;
+        markerPosition = LatLng(
+          rotaAtual.parada[i].latitude,
+          rotaAtual.parada[i].longitude,
+        );
+      }
+    }
+    return markerPosition;
   }
 }
