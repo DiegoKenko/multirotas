@@ -5,4 +5,6 @@ class Parada {
   double? longitude;
   String? tempoChegadaUsuario;
   String? tempoChegadaBusao;
+  String? distanciaAteUsuario;
+  String? distanciaAteBusao;
 }
