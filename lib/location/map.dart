@@ -30,7 +30,7 @@ class _MapViewState extends State<MapView> {
   bool mostraRotaAtual = false;
   bool ida = true;
   bool mapTapAllowed = false;
-  StreamSubscription<Position>? _currentPosition;
+  StreamSubscription<Position>? _currentPositionStream;
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(latMulti, longMult), // Multitécnica
     zoom: 16,
@@ -57,8 +57,8 @@ class _MapViewState extends State<MapView> {
 
   @override
   void dispose() {
-    _currentPosition?.cancel();
-    _currentPosition = null;
+    _currentPositionStream?.cancel();
+    _currentPositionStream = null;
     mapController.dispose();
     super.dispose();
   }
@@ -195,6 +195,17 @@ class _MapViewState extends State<MapView> {
                             snippet: "",
                           ),
                           icon: BitmapDescriptor.defaultMarker));
+                      mapController.animateCamera(
+                        CameraUpdate.newCameraPosition(
+                          CameraPosition(
+                            target: LatLng(
+                              paradaLatLng.latitude,
+                              paradaLatLng.longitude,
+                            ),
+                            zoom: 16,
+                          ),
+                        ),
+                      );
                     },
                   );
                 }
@@ -241,24 +252,35 @@ class _MapViewState extends State<MapView> {
                     )
                   : Container(),
             ),
+            DraggableScrollableSheet(builder: (builder, scrollContext) {
+              return Container(child:,);
+            }),
             Positioned(
               top: MediaQuery.of(context).size.height * 0.7,
               left: MediaQuery.of(context).size.width * 0.75,
               child: ClipOval(
                 child: SizedBox(
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.my_location,
-                      color: cameraDinamica
-                          ? const Color(0xFF57C0A4)
-                          : Colors.grey,
-                      size: 50,
+                  child: ClipOval(
+                    child: Material(
+                      color: Colors.white,
+                      child: InkWell(
+                        splashColor: Colors.blue,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.my_location,
+                            color: cameraDinamica
+                                ? const Color(0xFF373D69)
+                                : Colors.grey,
+                            size: 50,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              cameraDinamica = !cameraDinamica;
+                            });
+                          },
+                        ),
+                      ),
                     ),
-                    onPressed: () {
-                      setState(() {
-                        cameraDinamica = !cameraDinamica;
-                      });
-                    },
                   ),
                   height: 70,
                   width: 70,
@@ -293,7 +315,27 @@ class _MapViewState extends State<MapView> {
   // Atualização da localização como stream.
   // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getStremLocation() async {
-    _currentPosition = Geolocator.getPositionStream(
+    Geolocator.getCurrentPosition().then((value) => {
+          _initialLocation = CameraPosition(
+            target: LatLng(
+              value.latitude,
+              value.longitude,
+            ),
+          ),
+          mapController.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(
+                  _initialLocation.target.latitude,
+                  _initialLocation.target.longitude,
+                ),
+                zoom: 16,
+              ),
+            ),
+          ),
+        });
+    _currentPositionStream = Geolocator.getPositionStream(
+      intervalDuration: Duration(seconds: 10),
       desiredAccuracy: LocationAccuracy.high,
     ).listen((event) {
       _initialLocation = CameraPosition(
@@ -370,7 +412,7 @@ class _MapViewState extends State<MapView> {
     // Initializing Polyline
     Polyline polyline = Polyline(
       polylineId: id,
-      color: const Color.fromARGB(255, 241, 112, 7),
+      color: const Color(0xFF373D69),
       points: polylineCoordinates,
       width: 3,
     );

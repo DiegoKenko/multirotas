@@ -57,10 +57,14 @@ class TelaLoginState extends State<TelaLogin> {
                           decoration: InputDecoration(
                             hintText: 'CPF',
                             enabledBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(40)),
                               borderSide:
                                   BorderSide(color: Colors.white, width: 1.0),
                             ),
                             focusedBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(40)),
                               borderSide:
                                   BorderSide(color: Colors.white, width: 1.0),
                             ),
@@ -77,6 +81,8 @@ class TelaLoginState extends State<TelaLogin> {
                           decoration: InputDecoration(
                             hintText: 'Senha',
                             enabledBorder: OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.all(Radius.circular(40)),
                               borderSide:
                                   BorderSide(color: Colors.white, width: 1.0),
                             ),
@@ -90,7 +96,14 @@ class TelaLoginState extends State<TelaLogin> {
                       SizedBox(
                         width: 150,
                         child: ElevatedButton(
-                          style: const ButtonStyle(),
+                          style: ButtonStyle(
+                            shape: MaterialStateProperty.all<
+                                RoundedRectangleBorder>(
+                              RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(18.0),
+                              ),
+                            ),
+                          ),
                           child: const Text('ENTRAR',
                               style: TextStyle(fontSize: 17)),
                           onPressed: () {
