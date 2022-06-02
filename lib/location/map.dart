@@ -46,7 +46,6 @@ class _MapViewState extends State<MapView> {
   Set<Circle> circles = {};
   late Rota rotaAtual;
   TextEditingController buscaControllerDestino = TextEditingController();
-
   @override
   void initState() {
     super.initState();
@@ -206,6 +205,8 @@ class _MapViewState extends State<MapView> {
                           ),
                         ),
                       );
+
+                      mostraRotaAtual = true;
                     },
                   );
                 }
@@ -222,10 +223,7 @@ class _MapViewState extends State<MapView> {
               circles: circles,
             ),
             Positioned(
-              top: 0,
-              bottom: MediaQuery.of(context).size.height * 0.80,
-              left: 0,
-              right: 0,
+              top: MediaQuery.of(context).size.height * 0.2,
               child: mostraRotaAtual
                   ? Container(
                       child: ListTile(
@@ -252,9 +250,40 @@ class _MapViewState extends State<MapView> {
                     )
                   : Container(),
             ),
-            DraggableScrollableSheet(builder: (builder, scrollContext) {
-              return Container(child:,);
-            }),
+            DraggableScrollableSheet(
+              minChildSize: 0.1,
+              initialChildSize: 0.1,
+              maxChildSize: 0.5,
+              builder:
+                  (BuildContext context, ScrollController scrollController) {
+                return ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: todasRotasProximas.length + 1,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return const Card(
+                        child: Padding(
+                          padding: EdgeInsets.only(left: 5, right: 5),
+                          child: Center(
+                            child: Text(
+                              'Rotas:',
+                              style: TextStyle(
+                                color: Colors.white,
+                                letterSpacing: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                        shadowColor: Colors.white,
+                        color: Color(0xFF373D69),
+                      );
+                    } else {
+                      return cardRota(todasRotasProximas[index - 1]);
+                    }
+                  },
+                );
+              },
+            ),
             Positioned(
               top: MediaQuery.of(context).size.height * 0.7,
               left: MediaQuery.of(context).size.width * 0.75,
@@ -287,21 +316,6 @@ class _MapViewState extends State<MapView> {
                 ),
               ),
             ),
-            ida
-                ? Positioned.fill(
-                    bottom: 0,
-                    top: MediaQuery.of(context).size.height * 0.8,
-                    left: 0,
-                    right: 0,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: todasRotasProximas.length,
-                      itemBuilder: (context, index) {
-                        return cardRota(todasRotasProximas[index]);
-                      },
-                    ),
-                  )
-                : Container(),
           ],
         ),
       ),
@@ -335,7 +349,7 @@ class _MapViewState extends State<MapView> {
           ),
         });
     _currentPositionStream = Geolocator.getPositionStream(
-      intervalDuration: Duration(seconds: 10),
+      intervalDuration: const Duration(seconds: 10),
       desiredAccuracy: LocationAccuracy.high,
     ).listen((event) {
       _initialLocation = CameraPosition(
