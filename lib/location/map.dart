@@ -205,8 +205,6 @@ class _MapViewState extends State<MapView> {
                           ),
                         ),
                       );
-
-                      mostraRotaAtual = true;
                     },
                   );
                 }
@@ -223,18 +221,18 @@ class _MapViewState extends State<MapView> {
               circles: circles,
             ),
             Positioned(
-              top: MediaQuery.of(context).size.height * 0.2,
+              top: 0,
+              left: 0,
+              bottom: MediaQuery.of(context).size.height * 0.7,
+              right: 0,
               child: mostraRotaAtual
                   ? Container(
                       child: ListTile(
                         title: Center(
-                          child: mapTapAllowed
-                              ? Text(
-                                  rotaAtual.nome,
-                                  style: const TextStyle(fontSize: 30),
-                                )
-                              : const Text(''),
-                        ),
+                            child: Text(
+                          rotaAtual.nome,
+                          style: const TextStyle(fontSize: 30),
+                        )),
                         trailing: IconButton(
                           onPressed: () {
                             setState(() {
@@ -245,8 +243,7 @@ class _MapViewState extends State<MapView> {
                           icon: const Icon(Icons.close, size: 40),
                         ),
                       ),
-                      height: 40,
-                      color: const Color.fromRGBO(255, 255, 255, 0.4),
+                      color: Colors.white,
                     )
                   : Container(),
             ),
@@ -463,6 +460,9 @@ class _MapViewState extends State<MapView> {
               (element) => (element.id == rota.id),
             );
             montaPolyline(rotaAtual);
+            setState(() {
+              mostraRotaAtual = true;
+            });
           }
         },
       ),
