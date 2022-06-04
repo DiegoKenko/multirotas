@@ -22,6 +22,9 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  final Color busaoColor = const Color(0xFF00A8E8);
+  final Color rotaColor = const Color(0xFF373D69);
+  final Color usuarioColor = Color.fromARGB(106, 19, 232, 0);
   static const double latMulti = -19.49392296505924;
   static const double longMult = -44.30632263820034;
   double raioBuscaMetro = 600;
@@ -74,7 +77,7 @@ class _MapViewState extends State<MapView> {
       child: Scaffold(
         drawer: Drawer(
           elevation: 2,
-          backgroundColor: Color(0xAA373D69),
+          backgroundColor: const Color(0xAA373D69),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 80),
@@ -99,34 +102,6 @@ class _MapViewState extends State<MapView> {
                       },
                     ),
                   ),
-                  /*     const Padding(
-                  padding: EdgeInsets.only(left: 20, right: 20, top: 60),
-                  child: Text(
-                    'alcance',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 20),
-                  child: SizedBox(
-                    child: Slider(
-                      thumbColor: Colors.white,
-                      divisions: 5,
-                      label: '${raioBuscaMetro.round()}',
-                      inactiveColor: Colors.amber,
-                      value: raioBuscaMetro,
-                      onChanged: (value) {
-                        setState(() {
-                          raioBuscaMetro = value;
-                        });
-                      },
-                      min: 200,
-                      max: 2200,
-                    ),
-                  ),
-                ), */
                   ListTile(
                       leading: const Text(
                         'Estilo do mapa ',
@@ -151,7 +126,7 @@ class _MapViewState extends State<MapView> {
           ),
         ),
         appBar: AppBar(
-          backgroundColor: Color(0xFF373D69),
+          backgroundColor: const Color(0xFF373D69),
           actions: const [],
           title: ida
               ? Container()
@@ -192,39 +167,58 @@ class _MapViewState extends State<MapView> {
               },
               onTap: (pos) async {
                 if (mapTapAllowed) {
+                  Parada paradaAtualTemp;
                   Marker markerM = await markerMulti();
                   LatLng? paradaLatLng = await buscaParadaProxima(pos);
-                  paradaAtual = await detalhesParada(
+                  paradaAtualTemp = await detalhesParada(
                       rotaAtual,
                       paradaLatLng!,
                       const LatLng(latMulti, longMult),
                       _initialLocation.target);
-                  setState(
-                    () {
-                      mostraParadaAtual = true;
-                      markers.clear();
-                      markers.add(markerM);
-                      markers.add(Marker(
-                          markerId: const MarkerId("nearestMarker"),
-                          position: paradaLatLng,
-                          infoWindow: InfoWindow(
-                            title: "Parada mais próxima",
-                            snippet: rotaAtual.nome,
-                          ),
-                          icon: BitmapDescriptor.defaultMarker));
-                      mapController.animateCamera(
-                        CameraUpdate.newCameraPosition(
-                          CameraPosition(
-                            target: LatLng(
-                              paradaLatLng.latitude,
-                              paradaLatLng.longitude,
+                  if (paradaAtual != paradaAtualTemp) {
+                    setState(
+                      () {
+                        paradaAtual = paradaAtualTemp;
+                        mostraParadaAtual = true;
+
+                        // Adiciona marcadores
+                        markers.clear();
+                        markers.add(markerM);
+                        markers.add(Marker(
+                            markerId: const MarkerId("nearestMarker"),
+                            position: paradaLatLng,
+                            infoWindow: InfoWindow(
+                              title: "Parada mais próxima",
+                              snippet: rotaAtual.nome,
                             ),
-                            zoom: 16,
+                            icon: BitmapDescriptor.defaultMarker));
+                        // Cria polilynes
+                        _createPolylines(
+                                _initialLocation.target.latitude,
+                                _initialLocation.target.longitude,
+                                paradaAtual.latitude!,
+                                paradaAtual.longitude!,
+                                'trajetoUsuario',
+                                [],
+                                usuarioColor)
+                            .then((value) {
+                          polylines[value.polylineId] = value;
+                        });
+                        // Muda camera
+                        mapController.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(
+                              target: LatLng(
+                                paradaLatLng.latitude,
+                                paradaLatLng.longitude,
+                              ),
+                              zoom: 16,
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  );
+                        );
+                      },
+                    );
+                  }
                 }
               },
               markers: Set<Marker>.from(markers),
@@ -248,9 +242,9 @@ class _MapViewState extends State<MapView> {
                       children: [
                         Container(
                           decoration: BoxDecoration(
-                            color: Color.fromARGB(225, 255, 255, 255),
-                            border:
-                                Border.all(color: Color(0xFF373D69), width: 2),
+                            color: const Color.fromARGB(225, 255, 255, 255),
+                            border: Border.all(
+                                color: const Color(0xFF373D69), width: 2),
                           ),
                           child: ListTile(
                             tileColor: Colors.amberAccent,
@@ -269,7 +263,7 @@ class _MapViewState extends State<MapView> {
                                     ? Text(paradaAtual.thoroughfare! +
                                         ', ' +
                                         paradaAtual.subThoroughfare!)
-                                    : Text(''),
+                                    : const Text(''),
                               ],
                             ),
                             trailing: IconButton(
@@ -290,44 +284,50 @@ class _MapViewState extends State<MapView> {
                         if (mostraParadaAtual)
                           Container(
                             decoration: BoxDecoration(
-                              color: Color.fromARGB(225, 255, 255, 255),
+                              color: const Color.fromARGB(225, 255, 255, 255),
                               border: Border.all(
-                                  color: Color(0xFF373D69), width: 1),
+                                  color: const Color(0xFF373D69), width: 1),
                             ),
-                            child: Row(
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Icon(Icons.directions_walk),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(paradaAtual.tempoChegadaUsuario
-                                      .toString()),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(paradaAtual.distanciaAteUsuario
-                                      .toString()),
-                                ),
-                                SizedBox(
-                                  width: 10,
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Icon(Icons.directions_bus_rounded),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(
-                                      paradaAtual.tempoChegadaBusao.toString()),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(
-                                      paradaAtual.distanciaAteBusao.toString()),
-                                ),
-                              ],
+                            child: SizedBox(
+                              width: MediaQuery.of(context).size.width,
+                              height: 40,
+                              child: ListView(
+                                shrinkWrap: true,
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(Icons.directions_walk),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(paradaAtual.tempoChegadaUsuario
+                                        .toString()),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(paradaAtual.distanciaAteUsuario
+                                        .toString()),
+                                  ),
+                                  const SizedBox(
+                                    width: 10,
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(Icons.directions_bus_rounded),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(paradaAtual.tempoChegadaBusao
+                                        .toString()),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: Text(paradaAtual.distanciaAteBusao
+                                        .toString()),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                         else
@@ -476,7 +476,11 @@ class _MapViewState extends State<MapView> {
     double destinationLongitude,
     String nomeId,
     List<PolylineWayPoint> paradas,
+    Color cor,
   ) async {
+    // Limpa polylineAtual
+    polylines[PolylineId(nomeId)] = Polyline(polylineId: PolylineId(nomeId));
+
     // Initializing PolylinePoints
     List<LatLng> polylineCoordinates = [];
     polylinePoints = PolylinePoints();
@@ -514,7 +518,7 @@ class _MapViewState extends State<MapView> {
     // Initializing Polyline
     Polyline polyline = Polyline(
       polylineId: id,
-      color: const Color(0xFF373D69),
+      color: cor,
       points: polylineCoordinates,
       width: 3,
     );
@@ -613,13 +617,14 @@ class _MapViewState extends State<MapView> {
       );
     }
     _createPolylines(
-      rota.parada[0].latitude,
-      rota.parada[0].longitude,
-      rota.parada[rota.parada.length - 1].latitude,
-      rota.parada[rota.parada.length - 1].longitude,
-      rota.nome,
-      wayPoints,
-    ).then(
+            rota.parada[0].latitude,
+            rota.parada[0].longitude,
+            rota.parada[rota.parada.length - 1].latitude,
+            rota.parada[rota.parada.length - 1].longitude,
+            rota.nome,
+            wayPoints,
+            rotaColor)
+        .then(
       (value) {
         limpaMarcacoes();
         setState(
@@ -769,8 +774,8 @@ class _MapViewState extends State<MapView> {
     LatLng posBusao,
     LatLng posUsuario,
   ) async {
-    String travelModeBusao = "DRIVING";
-    String travelModeUsuario = "WALKING";
+    String travelModeBusao = "driving";
+    String travelModeUsuario = "walking";
     Parada parada = Parada();
     List<Placemark> lugares =
         await placemarkFromCoordinates(posParada.latitude, posParada.longitude);
@@ -815,6 +820,8 @@ class _MapViewState extends State<MapView> {
         retUsu.data['rows'].first['elements'].first['distance']['text'];
     parada.distanciaAteBusao =
         retBus.data['rows'].first['elements'].first['distance']['text'];
+    parada.latitude = posParada.latitude;
+    parada.longitude = posParada.longitude;
     return parada;
   }
 
