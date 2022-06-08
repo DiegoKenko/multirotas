@@ -22,9 +22,9 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  final Color busaoColor = const Color(0xFF00A8E8);
-  final Color rotaColor = const Color(0xFF373D69);
-  final Color usuarioColor = Color.fromARGB(106, 19, 232, 0);
+  final Color rotaColor = const Color.fromARGB(255, 255, 145, 0);
+  final Color busaoColor = const Color.fromARGB(255, 0, 102, 255);
+  final Color usuarioColor = const Color.fromARGB(106, 19, 232, 0);
   static const double latMulti = -19.49392296505924;
   static const double longMult = -44.30632263820034;
   double raioBuscaMetro = 600;
@@ -75,9 +75,10 @@ class _MapViewState extends State<MapView> {
       height: height,
       width: width,
       child: Scaffold(
+        drawerScrimColor: const Color.fromARGB(144, 0, 0, 0),
         drawer: Drawer(
           elevation: 2,
-          backgroundColor: const Color(0xAA373D69),
+          backgroundColor: Color.fromARGB(255, 55, 61, 105),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 80),
@@ -85,7 +86,7 @@ class _MapViewState extends State<MapView> {
                 children: [
                   ListTile(
                     leading: const Text(
-                      'Ida',
+                      'Caminho de ida até a Multitécnica',
                       style: TextStyle(
                         color: Colors.white,
                       ),
@@ -117,7 +118,7 @@ class _MapViewState extends State<MapView> {
                           },
                           icon: Icon(
                             Icons.map,
-                            color: normalMap ? Colors.grey : Colors.green,
+                            color: normalMap ? Colors.grey : Colors.amber,
                           )))
                 ],
                 mainAxisAlignment: MainAxisAlignment.start,
@@ -132,23 +133,22 @@ class _MapViewState extends State<MapView> {
               ? Container()
               : Center(
                   child: TextField(
+                    style: const TextStyle(color: Colors.white),
                     controller: buscaControllerDestino,
                     decoration: InputDecoration(
-                        suffixIcon: IconButton(
-                          icon: const Icon(Icons.search),
-                          onPressed: () {
-                            FocusScope.of(context)
-                                .unfocus(); // esconder teclado
-                            buscaRotaPorEndereco();
-                          },
-                        ),
-                        hintText: 'destino...',
-                        fillColor: Colors.white,
-                        focusColor: Colors.white,
-                        prefixIconColor: Colors.white,
-                        iconColor: Colors.white,
-                        suffixIconColor: Colors.white,
-                        hoverColor: Colors.white),
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.search, color: Colors.white),
+                        onPressed: () {
+                          limpaMarcacoes();
+                          FocusScope.of(context).unfocus(); // esconder teclado
+                          buscaRotaPorEndereco();
+                        },
+                      ),
+                      hintText: 'destino...',
+                      hintStyle: const TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
         ),
@@ -166,7 +166,10 @@ class _MapViewState extends State<MapView> {
                 changeMapMode(mapController);
               },
               onTap: (pos) async {
-                if (mapTapAllowed) {
+                if (mapTapAllowed && ida) {
+                  var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+                      const ImageConfiguration(size: Size(100, 100)),
+                      "assets/paradaMap.png");
                   Parada paradaAtualTemp;
                   Marker markerM = await markerMulti();
                   LatLng? paradaLatLng = await buscaParadaProxima(pos);
@@ -184,11 +187,14 @@ class _MapViewState extends State<MapView> {
                         // Adiciona marcadores
                         markers.clear();
                         markers.add(markerM);
-                        markers.add(Marker(
+                        markers.add(
+                          Marker(
                             anchor: const Offset(0.5, 0.5),
                             markerId: const MarkerId("nearestMarker"),
                             position: paradaLatLng,
-                            icon: BitmapDescriptor.defaultMarker));
+                            icon: iconMarkerParada,
+                          ),
+                        );
                         // Cria polilynes
                         _createPolylines(
                                 _initialLocation.target.latitude,
@@ -248,19 +254,20 @@ class _MapViewState extends State<MapView> {
                             tileColor: Colors.amberAccent,
                             title: Column(
                               children: [
-                                Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Align(
-                                      alignment: Alignment.topCenter,
-                                      child: Text(
-                                        rotaAtual.nome,
-                                        style: const TextStyle(fontSize: 30),
-                                      )),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    rotaAtual.nome,
+                                    style: const TextStyle(fontSize: 30),
+                                  ),
                                 ),
                                 mostraParadaAtual
-                                    ? Text(paradaAtual.thoroughfare! +
-                                        ', ' +
-                                        paradaAtual.subThoroughfare!)
+                                    ? Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(paradaAtual.thoroughfare! +
+                                            ', ' +
+                                            paradaAtual.subThoroughfare!),
+                                      )
                                     : const Text(''),
                               ],
                             ),
@@ -268,6 +275,7 @@ class _MapViewState extends State<MapView> {
                               onPressed: () {
                                 setState(() {
                                   mostraRotaAtual = false;
+                                  mapTapAllowed = false;
                                   limpaMarcacoes();
                                 });
                               },
@@ -353,14 +361,14 @@ class _MapViewState extends State<MapView> {
                                   child: Text(
                                     'Rotas:',
                                     style: TextStyle(
-                                      color: Colors.white,
-                                      letterSpacing: 2,
+                                      color: Color(0xFF373D69),
+                                      letterSpacing: 3,
                                     ),
                                   ),
                                 ),
                               ),
                               shadowColor: Colors.white,
-                              color: Color(0xFF373D69),
+                              color: Color.fromARGB(255, 240, 224, 4),
                             );
                           } else {
                             return cardRota(todasRotasProximas[index - 1]);
@@ -415,27 +423,32 @@ class _MapViewState extends State<MapView> {
   // Atualização da localização como stream.
   // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getStremLocation() async {
-    Geolocator.getCurrentPosition().then((value) => {
-          _initialLocation = CameraPosition(
-            target: LatLng(
-              value.latitude,
-              value.longitude,
-            ),
+    Geolocator.getCurrentPosition().then(
+      (value) => {
+        _initialLocation = CameraPosition(
+          target: LatLng(
+            value.latitude,
+            value.longitude,
           ),
-          mapController.animateCamera(
-            CameraUpdate.newCameraPosition(
-              CameraPosition(
-                target: LatLng(
-                  _initialLocation.target.latitude,
-                  _initialLocation.target.longitude,
-                ),
-                zoom: 16,
+        ),
+        mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                _initialLocation.target.latitude,
+                _initialLocation.target.longitude,
               ),
+              zoom: 16,
             ),
           ),
-        });
+        ),
+        setState(
+          () {},
+        )
+      },
+    );
     _currentPositionStream = Geolocator.getPositionStream(
-      intervalDuration: const Duration(seconds: 10),
+      intervalDuration: const Duration(seconds: 5),
       desiredAccuracy: LocationAccuracy.high,
     ).listen((event) {
       _initialLocation = CameraPosition(
@@ -672,7 +685,6 @@ class _MapViewState extends State<MapView> {
       markerId: MarkerId(counter.toString()),
       position: LatLng(locais.first.latitude, locais.first.longitude),
       infoWindow: InfoWindow(title: buscaControllerDestino.text),
-      onDrag: (obj) {},
       icon: iconMarkerParada,
     ));
 

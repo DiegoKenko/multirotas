@@ -54,7 +54,15 @@ class TelaLoginState extends State<TelaLogin> {
                         padding: EdgeInsets.only(
                             left: 20.0, right: 20, bottom: 20, top: 0),
                         child: TextField(
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
+                            hintStyle: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                            ),
                             hintText: 'CPF',
                             enabledBorder: OutlineInputBorder(
                               borderRadius:
@@ -78,7 +86,15 @@ class TelaLoginState extends State<TelaLogin> {
                           obscureText: true,
                           enableSuggestions: false,
                           autocorrect: false,
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: Colors.white,
+                          ),
                           decoration: InputDecoration(
+                            hintStyle: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                            ),
                             hintText: 'Senha',
                             enabledBorder: OutlineInputBorder(
                               borderRadius:
@@ -134,7 +150,10 @@ class TelaLoginState extends State<TelaLogin> {
                     ),
                     const Text(
                       'Carregando...',
-                      style: TextStyle(fontSize: 22),
+                      style: TextStyle(
+                        fontSize: 22,
+                        letterSpacing: 3,
+                      ),
                     )
                   ],
                 ),
