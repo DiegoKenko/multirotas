@@ -185,12 +185,9 @@ class _MapViewState extends State<MapView> {
                         markers.clear();
                         markers.add(markerM);
                         markers.add(Marker(
+                            anchor: const Offset(0.5, 0.5),
                             markerId: const MarkerId("nearestMarker"),
                             position: paradaLatLng,
-                            infoWindow: InfoWindow(
-                              title: "Parada mais próxima",
-                              snippet: rotaAtual.nome,
-                            ),
                             icon: BitmapDescriptor.defaultMarker));
                         // Cria polilynes
                         _createPolylines(
@@ -200,7 +197,8 @@ class _MapViewState extends State<MapView> {
                                 paradaAtual.longitude!,
                                 'trajetoUsuario',
                                 [],
-                                usuarioColor)
+                                usuarioColor,
+                                5)
                             .then((value) {
                           polylines[value.polylineId] = value;
                         });
@@ -470,14 +468,14 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<Polyline> _createPolylines(
-    double startLatitude,
-    double startLongitude,
-    double destinationLatitude,
-    double destinationLongitude,
-    String nomeId,
-    List<PolylineWayPoint> paradas,
-    Color cor,
-  ) async {
+      double startLatitude,
+      double startLongitude,
+      double destinationLatitude,
+      double destinationLongitude,
+      String nomeId,
+      List<PolylineWayPoint> paradas,
+      Color cor,
+      int largura) async {
     // Limpa polylineAtual
     polylines[PolylineId(nomeId)] = Polyline(polylineId: PolylineId(nomeId));
 
@@ -520,7 +518,7 @@ class _MapViewState extends State<MapView> {
       polylineId: id,
       color: cor,
       points: polylineCoordinates,
-      width: 3,
+      width: largura,
     );
 
     // Adding the polyline to the map
@@ -623,7 +621,8 @@ class _MapViewState extends State<MapView> {
             rota.parada[rota.parada.length - 1].longitude,
             rota.nome,
             wayPoints,
-            rotaColor)
+            rotaColor,
+            10)
         .then(
       (value) {
         limpaMarcacoes();
