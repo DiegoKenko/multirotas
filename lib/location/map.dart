@@ -78,7 +78,7 @@ class _MapViewState extends State<MapView> {
         drawerScrimColor: const Color.fromARGB(144, 0, 0, 0),
         drawer: Drawer(
           elevation: 2,
-          backgroundColor: Color.fromARGB(255, 55, 61, 105),
+          backgroundColor: const Color.fromARGB(255, 55, 61, 105),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 80),
