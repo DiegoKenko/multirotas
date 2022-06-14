@@ -1,20 +1,43 @@
-import 'dart:async';
-import 'dart:convert';
-import 'package:firebase_database/firebase_database.dart';
+import 'dart:async' show StreamSubscription;
+import 'dart:convert' show utf8;
+import 'package:firebase_database/firebase_database.dart'
+    show DatabaseEvent, DatabaseReference, FirebaseDatabase;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter/services.dart' show ByteData, rootBundle;
+import 'package:flutter_polyline_points/flutter_polyline_points.dart'
+    show
+        PolylinePoints,
+        PolylineWayPoint,
+        PointLatLng,
+        PolylineResult,
+        TravelMode;
+import 'package:geocoding/geocoding.dart'
+    show Location, Placemark, locationFromAddress, placemarkFromCoordinates;
+import 'package:google_maps_flutter/google_maps_flutter.dart'
+    show
+        CameraPosition,
+        LatLng,
+        GoogleMap,
+        GoogleMapController,
+        PolylineId,
+        Polyline,
+        Marker,
+        Circle,
+        MarkerId,
+        MapType,
+        BitmapDescriptor,
+        CameraUpdate,
+        InfoWindow,
+        CircleId;
+import 'package:geolocator/geolocator.dart'
+    show Position, Geolocator, LocationAccuracy;
 import 'package:multirotas/class/busao.dart';
 import 'package:multirotas/class/rota.dart';
-import 'package:multirotas/firebase/firestore.dart';
-import 'package:dio/dio.dart';
-import 'package:multirotas/firebase_options.dart';
+import 'package:multirotas/firebase/firestore.dart' show Firestore;
+import 'package:dio/dio.dart' show Dio;
+import 'package:multirotas/firebase_options.dart' show DefaultFirebaseOptions;
 import 'package:multirotas/location/haversine.dart';
-
-import '../class/parada.dart';
+import 'package:multirotas/class/parada.dart';
 
 class MapView extends StatefulWidget {
   const MapView({Key? key}) : super(key: key);
@@ -24,7 +47,7 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  final Color rotaColor = const Color.fromARGB(255, 255, 124, 1);
+  final Color rotaColor = const Color.fromARGB(255, 51, 197, 241);
   final Color busaoColor = const Color.fromARGB(255, 0, 102, 255);
   final Color usuarioColor = const Color.fromARGB(106, 19, 232, 0);
   static const double latMulti = -19.49392296505924;
@@ -387,13 +410,14 @@ class _MapViewState extends State<MapView> {
                         itemCount: todasRotasProximas.length + 1,
                         itemBuilder: (context, index) {
                           if (index == 0) {
-                            return const Card(
+                            return Card(
                               child: Padding(
-                                padding: EdgeInsets.only(left: 5, right: 5),
+                                padding:
+                                    const EdgeInsets.only(left: 5, right: 5),
                                 child: Center(
                                   child: Text(
-                                    'Rotas:',
-                                    style: TextStyle(
+                                    'Rotas:'.toUpperCase(),
+                                    style: const TextStyle(
                                       color: Color(0xFF373D69),
                                       letterSpacing: 3,
                                     ),
@@ -401,7 +425,7 @@ class _MapViewState extends State<MapView> {
                                 ),
                               ),
                               shadowColor: Colors.white,
-                              color: Color.fromARGB(255, 240, 224, 4),
+                              color: const Color.fromARGB(255, 240, 224, 4),
                             );
                           } else {
                             return cardRota(todasRotasProximas[index - 1]);
@@ -582,7 +606,7 @@ class _MapViewState extends State<MapView> {
         child: Card(
           child: Center(
             child: Text(
-              rota.nome,
+              rota.nome.toUpperCase(),
               style: const TextStyle(
                 color: Colors.white,
                 letterSpacing: 2,
@@ -601,6 +625,7 @@ class _MapViewState extends State<MapView> {
             _getStremRealtimeBusao(rotaAtual);
             mostraRotaAtual = true;
             polylines.clear();
+
             markers.removeWhere((element) => element.markerId.value == 'busao');
             markers.removeWhere(
                 (element) => element.markerId.value == 'nearestMarker');
@@ -898,24 +923,32 @@ class _MapViewState extends State<MapView> {
   _getStremRealtimeBusao(Rota rota) {
     DatabaseReference ref =
         FirebaseDatabase.instance.ref('localizacaoBusao/' + rota.id);
-    _currentPositionStreamBusao = ref.onValue.listen((DatabaseEvent event) {
+    _currentPositionStreamBusao =
+        ref.onValue.listen((DatabaseEvent event) async {
       Map<dynamic, dynamic> tempBusao =
           event.snapshot.value as Map<dynamic, dynamic>;
       busaoAtual = Busao.fromMap(tempBusao);
-      detalhesParada(
-              rotaAtual,
-              LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
-              LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-              _initialLocation.target)
-          .then((value) {
-        setState(() {
-          paradaAtual = value;
-          markers.add(Marker(
-            markerId: const MarkerId('busao'),
-            position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-          ));
+
+      if (mostraParadaAtual) {
+        var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
+            const ImageConfiguration(size: Size(100, 100)), "assets/busao.png");
+        detalhesParada(
+                rotaAtual,
+                LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
+                LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+                _initialLocation.target)
+            .then((value) {
+          setState(() {
+            paradaAtual = value;
+            markers.add(Marker(
+              // rotation: ,
+              markerId: const MarkerId('busao'),
+              icon: iconMarkerBusao,
+              position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+            ));
+          });
         });
-      });
+      }
     });
   }
 }

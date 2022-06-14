@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:multirotas/telas/mapa.dart';
+import 'package:multirotas/telas/mapa.dart' show TelaMapa;
 import 'comp/decDegrade.dart';
-import 'firebase_options.dart';
-import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart' show DefaultFirebaseOptions;
+import 'package:firebase_core/firebase_core.dart' show Firebase;
 
 void main() {
   runApp(const MultiRotas());
@@ -50,6 +50,14 @@ class TelaLoginState extends State<TelaLogin> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Image.asset(
+                            'assets/carregamento.png',
+                          ),
+                        ),
+                      ),
                       const Padding(
                         padding: EdgeInsets.only(
                             left: 20.0, right: 20, bottom: 20, top: 0),

@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
 import 'package:multirotas/class/rota.dart';
 import 'package:multirotas/location/haversine.dart';
 

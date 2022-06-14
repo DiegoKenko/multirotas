@@ -48,9 +48,10 @@ flutter:
   assets:
   - assets/carregamento.png
   - assets/mtMap.png
+  - assets/busao.png
   - assets/paradaMap.png
   - assets/mapStyle.json
 flutter_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "lib/assets/launch.png"
+  image_path: "assets/launch.png"
