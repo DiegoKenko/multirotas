@@ -11,7 +11,6 @@ import 'package:multirotas/class/busao.dart';
 import 'package:multirotas/class/rota.dart';
 import 'package:multirotas/firebase/firestore.dart';
 import 'package:dio/dio.dart';
-import 'package:multirotas/firebase/realtime.dart';
 import 'package:multirotas/firebase_options.dart';
 import 'package:multirotas/location/haversine.dart';
 
@@ -25,7 +24,7 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
-  final Color rotaColor = const Color.fromARGB(255, 255, 145, 0);
+  final Color rotaColor = const Color.fromARGB(255, 255, 124, 1);
   final Color busaoColor = const Color.fromARGB(255, 0, 102, 255);
   final Color usuarioColor = const Color.fromARGB(106, 19, 232, 0);
   static const double latMulti = -19.49392296505924;
@@ -212,6 +211,7 @@ class _MapViewState extends State<MapView> {
                           ),
                         );
                         // Cria polilynes
+                        /*    // Trajeto do usuário removido 
                         _createPolylines(
                                 _initialLocation.target.latitude,
                                 _initialLocation.target.longitude,
@@ -223,7 +223,7 @@ class _MapViewState extends State<MapView> {
                                 5)
                             .then((value) {
                           polylines[value.polylineId] = value;
-                        });
+                        }); */
                         // Muda camera
                         mapController.animateCamera(
                           CameraUpdate.newCameraPosition(
@@ -290,13 +290,15 @@ class _MapViewState extends State<MapView> {
                             trailing: IconButton(
                               onPressed: () {
                                 setState(() {
+                                  polylines.clear();
+                                  markers.removeWhere((element) =>
+                                      element.markerId.value ==
+                                      'nearestMarker');
+                                  markers.removeWhere((element) =>
+                                      element.markerId.value == 'busao');
                                   mostraRotaAtual = false;
                                   mapTapAllowed = false;
                                 });
-                                /* limpaMarcacoes(
-                                    polyline: true,
-                                    busaoStream: true,
-                                    paradaPosition: true); */
                               },
                               icon: const Icon(
                                 Icons.close_rounded,
@@ -322,34 +324,46 @@ class _MapViewState extends State<MapView> {
                                 children: [
                                   const Padding(
                                     padding: EdgeInsets.all(8.0),
-                                    child: Icon(Icons.directions_walk),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(paradaAtual.tempoChegadaUsuario
-                                        .toString()),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(paradaAtual.distanciaAteUsuario
-                                        .toString()),
-                                  ),
-                                  const SizedBox(
-                                    width: 10,
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.all(8.0),
                                     child: Icon(Icons.directions_bus_rounded),
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(paradaAtual.tempoChegadaBusao
-                                        .toString()),
+                                  const Padding(
+                                    padding: EdgeInsets.only(
+                                        top: 8, bottom: 8, left: 8),
+                                    child: Text(' A '),
                                   ),
                                   Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text(paradaAtual.distanciaAteBusao
-                                        .toString()),
+                                    padding: const EdgeInsets.only(
+                                      top: 8,
+                                      bottom: 8,
+                                    ),
+                                    child: Text(
+                                      paradaAtual.tempoChegadaBusao.toString(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: busaoColor,
+                                      ),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 8, bottom: 8),
+                                    child: Text(' e '),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: 8, bottom: 8),
+                                    child: Text(
+                                      paradaAtual.distanciaAteBusao.toString(),
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: busaoColor),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.only(
+                                      top: 8,
+                                      bottom: 8,
+                                    ),
+                                    child: Text(' até a parada selecionada. '),
                                   ),
                                 ],
                               ),
@@ -586,6 +600,10 @@ class _MapViewState extends State<MapView> {
             );
             _getStremRealtimeBusao(rotaAtual);
             mostraRotaAtual = true;
+            polylines.clear();
+            markers.removeWhere((element) => element.markerId.value == 'busao');
+            markers.removeWhere(
+                (element) => element.markerId.value == 'nearestMarker');
             montaPolyline(rotaAtual);
           }
         },
@@ -654,7 +672,7 @@ class _MapViewState extends State<MapView> {
             rota.nome,
             wayPoints,
             rotaColor,
-            10)
+            7)
         .then(
       (value) {
         setState(
@@ -884,11 +902,19 @@ class _MapViewState extends State<MapView> {
       Map<dynamic, dynamic> tempBusao =
           event.snapshot.value as Map<dynamic, dynamic>;
       busaoAtual = Busao.fromMap(tempBusao);
-      setState(() {
-        markers.add(Marker(
-          markerId: const MarkerId('busao'),
-          position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-        ));
+      detalhesParada(
+              rotaAtual,
+              LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
+              LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+              _initialLocation.target)
+          .then((value) {
+        setState(() {
+          paradaAtual = value;
+          markers.add(Marker(
+            markerId: const MarkerId('busao'),
+            position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+          ));
+        });
       });
     });
   }
