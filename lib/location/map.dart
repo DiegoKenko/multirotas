@@ -1,14 +1,43 @@
-import 'dart:async';
-import 'dart:convert';
+import 'dart:async' show StreamSubscription;
+import 'dart:convert' show utf8;
+import 'package:firebase_database/firebase_database.dart'
+    show DatabaseEvent, DatabaseReference, FirebaseDatabase;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:multirotas/class/Rota.dart';
-import 'package:multirotas/firebase/firestore.dart';
-import 'package:dio/dio.dart';
+import 'package:flutter/services.dart' show ByteData, rootBundle;
+import 'package:flutter_polyline_points/flutter_polyline_points.dart'
+    show
+        PolylinePoints,
+        PolylineWayPoint,
+        PointLatLng,
+        PolylineResult,
+        TravelMode;
+import 'package:geocoding/geocoding.dart'
+    show Location, Placemark, locationFromAddress, placemarkFromCoordinates;
+import 'package:google_maps_flutter/google_maps_flutter.dart'
+    show
+        CameraPosition,
+        LatLng,
+        GoogleMap,
+        GoogleMapController,
+        PolylineId,
+        Polyline,
+        Marker,
+        Circle,
+        MarkerId,
+        MapType,
+        BitmapDescriptor,
+        CameraUpdate,
+        InfoWindow,
+        CircleId;
+import 'package:geolocator/geolocator.dart'
+    show Position, Geolocator, LocationAccuracy;
+import 'package:multirotas/class/busao.dart';
+import 'package:multirotas/class/rota.dart';
+import 'package:multirotas/firebase/firestore.dart' show Firestore;
+import 'package:dio/dio.dart' show Dio;
+import 'package:multirotas/firebase_options.dart' show DefaultFirebaseOptions;
+import 'package:multirotas/location/haversine.dart';
+import 'package:multirotas/class/parada.dart';
 
 class MapView extends StatefulWidget {
   const MapView({Key? key}) : super(key: key);
@@ -18,18 +47,24 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  final Color rotaColor = const Color.fromARGB(255, 51, 197, 241);
+  final Color busaoColor = const Color.fromARGB(255, 0, 102, 255);
+  final Color usuarioColor = const Color.fromARGB(106, 19, 232, 0);
   static const double latMulti = -19.49392296505924;
   static const double longMult = -44.30632263820034;
-  double raioBuscaMetro = 1000;
+  double raioBuscaMetro = 600;
   bool normalMap = true;
-  bool cameraDinamica = true;
+  bool cameraDinamica = false;
   bool mostraRotaAtual = false;
+  bool mostraParadaAtual = false;
+  bool mostraBusaoAtual = false;
   bool ida = true;
-  StreamSubscription<Position>? _currentPosition;
-  final Geolocator geo = Geolocator();
+  bool mapTapAllowed = false;
+  StreamSubscription<Position>? _currentPositionStream;
+  StreamSubscription<DatabaseEvent>? _currentPositionStreamBusao;
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(latMulti, longMult), // Multitécnica
-    zoom: 15,
+    zoom: 16,
   );
   late GoogleMapController mapController;
   late PolylinePoints polylinePoints;
@@ -41,27 +76,29 @@ class _MapViewState extends State<MapView> {
   Set<Marker> markers = {};
   Set<Circle> circles = {};
   late Rota rotaAtual;
-  TextEditingController buscaControllerDestino = TextEditingController();
-  bool buscandoDestino = false;
-  String queryBuscaDestino = "";
-  Dio dio = Dio();
-  String key = 'AIzaSyDZT5coXo6WlxWHoe4iZGLYkg8bq7xK1CM';
-  double distanciaParadaUsuario = 0;
-  double distanciaParadaBusao = 0;
-  bool mostraLista = false;
 
+  late Busao busaoAtual;
+  late Parada paradaAtual = Parada();
+  Marker markerM = const Marker(markerId: MarkerId('mt'), visible: false);
+  Marker markersBusao =
+      const Marker(markerId: MarkerId('busao'), visible: false);
+  TextEditingController buscaControllerDestino = TextEditingController();
   @override
   void initState() {
     super.initState();
     _getStremLocation();
+    markerMulti();
     // Deve ser executado depois do _getStremLocation
     getRotas();
   }
 
   @override
   void dispose() {
-    _currentPosition?.cancel();
-    _currentPosition = null;
+    _currentPositionStream?.cancel();
+    _currentPositionStream = null;
+    _currentPositionStreamBusao?.cancel();
+    _currentPositionStreamBusao = null;
+    mapController.dispose();
     super.dispose();
   }
 
@@ -73,108 +110,159 @@ class _MapViewState extends State<MapView> {
       height: height,
       width: width,
       child: Scaffold(
+        drawerScrimColor: const Color.fromARGB(144, 0, 0, 0),
         drawer: Drawer(
+          elevation: 2,
+          backgroundColor: const Color.fromARGB(255, 55, 61, 105),
           child: Center(
             child: Padding(
               padding: const EdgeInsets.only(top: 80),
-              child: Column(children: [
-                ListTile(
-                  leading: const Text(
-                    'Ida',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                  trailing: Switch(
-                    inactiveThumbColor: Colors.white,
-                    activeColor: Colors.green,
-                    value: ida,
-                    onChanged: (bool value) {
-                      setState(() {
-                        ida = value;
-                      });
-                    },
-                  ),
-                ),
-                const Padding(
-                  padding: EdgeInsets.only(left: 20, right: 20, top: 60),
-                  child: Text(
-                    'alcance',
-                    style: TextStyle(
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(left: 20, right: 20),
-                  child: SizedBox(
-                    child: Slider(
-                      thumbColor: Colors.white,
-                      divisions: 5,
-                      label: '${raioBuscaMetro.round()}',
-                      inactiveColor: Colors.amber,
-                      value: raioBuscaMetro,
-                      onChanged: (value) {
-                        setState(() {
-                          raioBuscaMetro = value;
-                        });
-                      },
-                      min: 200,
-                      max: 2200,
-                    ),
-                  ),
-                ),
-                ListTile(
+              child: Column(
+                children: [
+                  ListTile(
                     leading: const Text(
-                      'Estilo do mapa ',
+                      'Caminho de ida até a Multitécnica',
                       style: TextStyle(
                         color: Colors.white,
                       ),
                     ),
-                    trailing: IconButton(
-                        onPressed: () {
-                          setState(() {
-                            normalMap = !normalMap;
-                          });
-                        },
-                        icon: Icon(
-                          Icons.map,
-                          color: normalMap ? Colors.grey : Colors.green,
-                        )))
-              ]),
+                    trailing: Switch(
+                      inactiveThumbColor: Colors.white,
+                      activeColor: Colors.green,
+                      value: ida,
+                      onChanged: (bool value) {
+                        setState(() {
+                          ida = value;
+                          mostraRotaAtual = false;
+                          mostraBusaoAtual = false;
+                          mostraParadaAtual = false;
+                          polylines.clear();
+                          markers.clear();
+                        });
+                      },
+                    ),
+                  ),
+                  ListTile(
+                      leading: const Text(
+                        'Estilo do mapa ',
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      trailing: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              normalMap = !normalMap;
+                            });
+                          },
+                          icon: Icon(
+                            Icons.map,
+                            color: normalMap ? Colors.grey : Colors.amber,
+                          )))
+                ],
+                mainAxisAlignment: MainAxisAlignment.start,
+              ),
             ),
           ),
-          elevation: 2,
-          backgroundColor: Colors.transparent,
         ),
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
+          backgroundColor: const Color(0xFF373D69),
+          actions: const [],
           title: ida
               ? Container()
               : Center(
                   child: TextField(
+                    style: const TextStyle(color: Colors.white),
                     controller: buscaControllerDestino,
                     decoration: InputDecoration(
                       suffixIcon: IconButton(
-                        icon: const Icon(Icons.search),
+                        icon: const Icon(Icons.search, color: Colors.white),
                         onPressed: () {
                           FocusScope.of(context).unfocus(); // esconder teclado
                           buscaRotaPorEndereco();
                         },
                       ),
                       hintText: 'destino...',
+                      hintStyle: const TextStyle(
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ),
-          actions: const [],
         ),
         body: Stack(
           alignment: AlignmentDirectional.bottomEnd,
           children: [
             GoogleMap(
+              onCameraMove: (position) {
+                setState(() {
+                  cameraDinamica = false;
+                });
+              },
               onMapCreated: (GoogleMapController controller) {
                 mapController = controller;
                 changeMapMode(mapController);
+              },
+              onTap: (pos) async {
+                if (mapTapAllowed && ida) {
+                  var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
+                      const ImageConfiguration(size: Size(100, 100)),
+                      "assets/paradaMap.png");
+                  Parada paradaAtualTemp;
+                  LatLng? paradaLatLng = await buscaParadaProxima(pos);
+
+                  paradaAtualTemp = await detalhesParada(
+                      rotaAtual,
+                      paradaLatLng!,
+                      LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+                      _initialLocation.target);
+
+                  if (paradaAtual != paradaAtualTemp) {
+                    setState(
+                      () {
+                        paradaAtual = paradaAtualTemp;
+                        mostraParadaAtual = true;
+                        // reseta marcadores
+                        //limpaMarcacoes();
+
+                        markers.add(
+                          Marker(
+                            anchor: const Offset(0.5, 0.5),
+                            markerId: const MarkerId("nearestMarker"),
+                            position: paradaLatLng,
+                            icon: iconMarkerParada,
+                          ),
+                        );
+                        // Cria polilynes
+                        /*    // Trajeto do usuário removido 
+                        _createPolylines(
+                                _initialLocation.target.latitude,
+                                _initialLocation.target.longitude,
+                                paradaAtual.latitude!,
+                                paradaAtual.longitude!,
+                                'trajetoUsuario',
+                                [],
+                                usuarioColor,
+                                5)
+                            .then((value) {
+                          polylines[value.polylineId] = value;
+                        }); */
+                        // Muda camera
+                        mapController.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(
+                              target: LatLng(
+                                paradaLatLng.latitude,
+                                paradaLatLng.longitude,
+                              ),
+                              zoom: 16,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }
+                }
               },
               markers: Set<Marker>.from(markers),
               compassEnabled: true,
@@ -189,70 +277,196 @@ class _MapViewState extends State<MapView> {
             ),
             Positioned(
               top: 0,
-              bottom: MediaQuery.of(context).size.height * 0.80,
               left: 0,
+              bottom: MediaQuery.of(context).size.height * 0.7,
               right: 0,
               child: mostraRotaAtual
-                  ? Container(
-                      child: ListTile(
-                        title: Center(
-                          child: Text(
-                            rotaAtual.nome,
-                            style: const TextStyle(fontSize: 30),
+                  ? Column(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: const Color.fromARGB(225, 255, 255, 255),
+                            border: Border.all(
+                                color: const Color(0xFF373D69), width: 2),
+                          ),
+                          child: ListTile(
+                            tileColor: Colors.amberAccent,
+                            title: Column(
+                              children: [
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    rotaAtual.nome,
+                                    style: const TextStyle(fontSize: 30),
+                                  ),
+                                ),
+                                mostraParadaAtual
+                                    ? Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(paradaAtual.thoroughfare! +
+                                            ', ' +
+                                            paradaAtual.subThoroughfare!),
+                                      )
+                                    : const Text(''),
+                              ],
+                            ),
+                            trailing: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  polylines.clear();
+                                  markers.removeWhere((element) =>
+                                      element.markerId.value ==
+                                      'nearestMarker');
+                                  markers.removeWhere((element) =>
+                                      element.markerId.value == 'busao');
+                                  mostraRotaAtual = false;
+                                  mapTapAllowed = false;
+                                });
+                              },
+                              icon: const Icon(
+                                Icons.close_rounded,
+                                size: 35,
+                                color: Colors.red,
+                              ),
+                            ),
                           ),
                         ),
-                        trailing: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              mostraRotaAtual = false;
-                              polylines.clear();
-                            });
-                          },
-                          icon: const Icon(Icons.close, size: 40),
-                        ),
-                      ),
-                      height: 40,
-                      color: const Color.fromRGBO(255, 255, 255, 0.4),
+                        if (mostraParadaAtual)
+                          Container(
+                            decoration: BoxDecoration(
+                              color: const Color.fromARGB(225, 255, 255, 255),
+                              border: Border.all(
+                                  color: const Color(0xFF373D69), width: 1),
+                            ),
+                            child: SizedBox(
+                              width: MediaQuery.of(context).size.width,
+                              height: 40,
+                              child: ListView(
+                                shrinkWrap: true,
+                                scrollDirection: Axis.horizontal,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.all(8.0),
+                                    child: Icon(Icons.directions_bus_rounded),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.only(
+                                        top: 8, bottom: 8, left: 8),
+                                    child: Text(' A '),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 8,
+                                      bottom: 8,
+                                    ),
+                                    child: Text(
+                                      paradaAtual.tempoChegadaBusao.toString(),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: busaoColor,
+                                      ),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 8, bottom: 8),
+                                    child: Text(' e '),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                        top: 8, bottom: 8),
+                                    child: Text(
+                                      paradaAtual.distanciaAteBusao.toString(),
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: busaoColor),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding: EdgeInsets.only(
+                                      top: 8,
+                                      bottom: 8,
+                                    ),
+                                    child: Text(' até a parada selecionada. '),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                        else
+                          Container(),
+                      ],
                     )
                   : Container(),
             ),
+            ida
+                ? DraggableScrollableSheet(
+                    minChildSize: 0.1,
+                    initialChildSize: 0.1,
+                    maxChildSize: 0.5,
+                    builder: (BuildContext context,
+                        ScrollController scrollController) {
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: todasRotasProximas.length + 1,
+                        itemBuilder: (context, index) {
+                          if (index == 0) {
+                            return Card(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.only(left: 5, right: 5),
+                                child: Center(
+                                  child: Text(
+                                    'Rotas:'.toUpperCase(),
+                                    style: const TextStyle(
+                                      color: Color(0xFF373D69),
+                                      letterSpacing: 3,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              shadowColor: Colors.white,
+                              color: const Color.fromARGB(255, 240, 224, 4),
+                            );
+                          } else {
+                            return cardRota(todasRotasProximas[index - 1]);
+                          }
+                        },
+                      );
+                    },
+                  )
+                : Container(),
             Positioned(
-              top: MediaQuery.of(context).size.height * 0.75,
+              top: MediaQuery.of(context).size.height * 0.7,
               left: MediaQuery.of(context).size.width * 0.75,
               child: ClipOval(
                 child: SizedBox(
-                  child: IconButton(
-                    icon: Icon(
-                      Icons.navigation,
-                      color: cameraDinamica
-                          ? const Color(0xFF57C0A4)
-                          : Colors.grey,
-                      size: 50,
+                  child: ClipOval(
+                    child: Material(
+                      color: Colors.white54,
+                      child: InkWell(
+                        splashColor: Colors.blue,
+                        child: IconButton(
+                          icon: Icon(
+                            Icons.my_location,
+                            color: cameraDinamica
+                                ? const Color(0xFF373D69)
+                                : Colors.grey,
+                            size: 40,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              cameraDinamica = !cameraDinamica;
+                            });
+                          },
+                        ),
+                      ),
                     ),
-                    onPressed: () {
-                      cameraDinamica = !cameraDinamica;
-                    },
                   ),
                   height: 70,
                   width: 70,
                 ),
               ),
             ),
-            ida
-                ? Positioned.fill(
-                    bottom: 0,
-                    top: MediaQuery.of(context).size.height * 0.8,
-                    left: 0,
-                    right: 0,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: todasRotasProximas.length,
-                      itemBuilder: (context, index) {
-                        return cardRota(todasRotasProximas[index]);
-                      },
-                    ),
-                  )
-                : Container()
           ],
         ),
       ),
@@ -266,7 +480,32 @@ class _MapViewState extends State<MapView> {
   // Atualização da localização como stream.
   // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getStremLocation() async {
-    _currentPosition = Geolocator.getPositionStream(
+    Geolocator.getCurrentPosition().then(
+      (value) => {
+        _initialLocation = CameraPosition(
+          target: LatLng(
+            value.latitude,
+            value.longitude,
+          ),
+        ),
+        mapController.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: LatLng(
+                _initialLocation.target.latitude,
+                _initialLocation.target.longitude,
+              ),
+              zoom: 16,
+            ),
+          ),
+        ),
+        setState(
+          () {},
+        )
+      },
+    );
+    _currentPositionStream = Geolocator.getPositionStream(
+      intervalDuration: const Duration(seconds: 5),
       desiredAccuracy: LocationAccuracy.high,
     ).listen((event) {
       _initialLocation = CameraPosition(
@@ -283,13 +522,15 @@ class _MapViewState extends State<MapView> {
                 _initialLocation.target.latitude,
                 _initialLocation.target.longitude,
               ),
-              zoom: 15,
+              zoom: 16,
             ),
           ),
         );
       }
+
       if (ida) {
         _rotasProximasIda();
+        if (mostraBusaoAtual && mostraParadaAtual && mostraRotaAtual) {}
         setState(() {
           attCircle(LatLng(_initialLocation.target.latitude,
               _initialLocation.target.longitude));
@@ -299,20 +540,24 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<Polyline> _createPolylines(
-    double startLatitude,
-    double startLongitude,
-    double destinationLatitude,
-    double destinationLongitude,
-    String nomeId,
-    List<PolylineWayPoint> paradas,
-  ) async {
+      double startLatitude,
+      double startLongitude,
+      double destinationLatitude,
+      double destinationLongitude,
+      String nomeId,
+      List<PolylineWayPoint> paradas,
+      Color cor,
+      int largura) async {
+    // Limpa polylineAtual
+    polylines[PolylineId(nomeId)] = Polyline(polylineId: PolylineId(nomeId));
+
     // Initializing PolylinePoints
     List<LatLng> polylineCoordinates = [];
     polylinePoints = PolylinePoints();
 
     // Generating the list of coordinates to be used for drawing the polylines
     PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
-      'AIzaSyC-cAQ95icIXxAelzKYLjwVVDCw-KFmuBw', // Google Maps API Key
+      DefaultFirebaseOptions.android.apiKey, // Google Maps API Key
       PointLatLng(
         startLatitude,
         startLongitude,
@@ -343,9 +588,9 @@ class _MapViewState extends State<MapView> {
     // Initializing Polyline
     Polyline polyline = Polyline(
       polylineId: id,
-      color: const Color.fromARGB(255, 241, 112, 7),
+      color: cor,
       points: polylineCoordinates,
-      width: 3,
+      width: largura,
     );
 
     // Adding the polyline to the map
@@ -361,7 +606,7 @@ class _MapViewState extends State<MapView> {
         child: Card(
           child: Center(
             child: Text(
-              rota.nome,
+              rota.nome.toUpperCase(),
               style: const TextStyle(
                 color: Colors.white,
                 letterSpacing: 2,
@@ -372,75 +617,19 @@ class _MapViewState extends State<MapView> {
           color: const Color(0xFF373D69),
         ),
         onTap: () {
-          polylines.clear();
           if (ida || rota.parada.isNotEmpty) {
-            showModalBottomSheet(
-              context: context,
-              builder: (builder) {
-                return SizedBox(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    scrollDirection: Axis.vertical,
-                    itemBuilder: (context, index) {
-                      return FutureBuilder(
-                          future: placemarkFromCoordinates(
-                              rota.parada[index].latitude,
-                              rota.parada[index].longitude),
-                          builder: (context, AsyncSnapshot asyncSnapshot) {
-                            if (asyncSnapshot.hasData) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(60),
-                                  border: Border(
-                                    top: BorderSide(
-                                      color: Colors.grey,
-                                      width: 6,
-                                    ),
-                                  ),
-                                ),
-                                child: ListTile(
-                                  tileColor: const Color(0xFF373D69),
-                                  onTap: () {
-                                    cameraDinamica = false;
-                                    mapController.animateCamera(
-                                      CameraUpdate.newCameraPosition(
-                                        CameraPosition(
-                                          target: LatLng(
-                                            rota.parada[index].latitude,
-                                            rota.parada[index].longitude,
-                                          ),
-                                          zoom: 17,
-                                        ),
-                                      ),
-                                    );
-                                    montaPolyline(
-                                      todasRotas.firstWhere(
-                                        (element) => (element.id == rota.id),
-                                      ),
-                                    );
-                                    Navigator.pop(context);
-                                  },
-                                  title: Text(
-                                    asyncSnapshot.data.first.thoroughfare +
-                                        ' - ' +
-                                        asyncSnapshot
-                                            .data.first.subThoroughfare,
-                                    style: const TextStyle(
-                                      color: Color(0xFF57C0A4),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            } else {
-                              return Container();
-                            }
-                          });
-                    },
-                    itemCount: rota.parada.length,
-                  ),
-                );
-              },
+            mapTapAllowed = true;
+            rotaAtual = todasRotas.firstWhere(
+              (element) => (element.id == rota.id),
             );
+            _getStremRealtimeBusao(rotaAtual);
+            mostraRotaAtual = true;
+            polylines.clear();
+
+            markers.removeWhere((element) => element.markerId.value == 'busao');
+            markers.removeWhere(
+                (element) => element.markerId.value == 'nearestMarker');
+            montaPolyline(rotaAtual);
           }
         },
       ),
@@ -449,10 +638,7 @@ class _MapViewState extends State<MapView> {
 
   Future<void> _rotasProximasIda() async {
     List<Rota> todasRotasTemp = [];
-    final markerMult = await markerMulti();
-    var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
-        const ImageConfiguration(size: Size(100, 100)), "assets/paradaMap.png");
-    Set<Marker> tempMarker = {};
+
     List<Rota> rotasProximas = await Firestore().rotasProximas(
         double.parse(_initialLocation.target.latitude.toString()),
         double.parse(_initialLocation.target.longitude.toString()),
@@ -460,38 +646,16 @@ class _MapViewState extends State<MapView> {
         ida);
     for (var i = 0; i < rotasProximas.length; i++) {
       todasRotasTemp.add(rotasProximas[i]);
-      for (var j = 0; j < rotasProximas[i].parada.length; j++) {
-        Rota rotaTempProx = rotasProximas[i];
-        Marker markTemp = Marker(
-          zIndex: i * 10.0 + j,
-          onTap: () {
-            setState(() {
-              cameraDinamica = false;
-            });
-          },
-          markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
-          position: LatLng(rotasProximas[i].parada[j].latitude,
-              rotasProximas[i].parada[j].longitude),
-          icon: iconMarkerParada,
-          infoWindow: InfoWindow(
-            title: rotasProximas[i].nome,
-          ),
-        );
-        tempMarker.add(markTemp);
-      }
     }
     setState(() {
-      markers.clear();
       todasRotasProximas = todasRotasTemp;
-      tempMarker.add(markerMult);
-      markers = tempMarker;
     });
   }
 
-  Future<Marker> markerMulti() async {
+  void markerMulti() async {
     var iconMarkerMulti = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/mtMap.png");
-    return Marker(
+    markerM = Marker(
       markerId: const MarkerId('mt'),
       position: const LatLng(latMulti, longMult),
       infoWindow: const InfoWindow(
@@ -526,17 +690,19 @@ class _MapViewState extends State<MapView> {
       );
     }
     _createPolylines(
-      rota.parada[0].latitude,
-      rota.parada[0].longitude,
-      rota.parada[rota.parada.length - 1].latitude,
-      rota.parada[rota.parada.length - 1].longitude,
-      rota.nome,
-      wayPoints,
-    ).then(
+            rota.parada[0].latitude,
+            rota.parada[0].longitude,
+            rota.parada[rota.parada.length - 1].latitude,
+            rota.parada[rota.parada.length - 1].longitude,
+            rota.nome,
+            wayPoints,
+            rotaColor,
+            7)
+        .then(
       (value) {
-        polylines.clear();
         setState(
           () {
+            //(polyline: true, busaoStream: true);
             polylines[value.polylineId] = value;
           },
         );
@@ -581,12 +747,11 @@ class _MapViewState extends State<MapView> {
       markerId: MarkerId(counter.toString()),
       position: LatLng(locais.first.latitude, locais.first.longitude),
       infoWindow: InfoWindow(title: buscaControllerDestino.text),
-      onDrag: (obj) {},
       icon: iconMarkerParada,
     ));
 
     setState(() {
-      markers.clear();
+      polylines.clear();
       markers = markerVolta;
       cameraDinamica = false;
       mapController.animateCamera(
@@ -596,7 +761,7 @@ class _MapViewState extends State<MapView> {
               locais.first.latitude,
               locais.first.longitude,
             ),
-            zoom: 15,
+            zoom: 16,
           ),
         ),
       );
@@ -605,7 +770,6 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _rotasProximasVolta(LatLng pos) async {
-    final markerMult = await markerMulti();
     final markerDestino = Marker(
       markerId: MarkerId(pos.toString()),
       position: LatLng(pos.latitude, pos.longitude),
@@ -650,7 +814,7 @@ class _MapViewState extends State<MapView> {
       }
     }
     setState(() {
-      tempMarker.add(markerMult);
+      tempMarker.add(markerM);
       tempMarker.add(markerDestino);
       markers = tempMarker;
     });
@@ -662,17 +826,129 @@ class _MapViewState extends State<MapView> {
         return ListTile(
           title: Text(
             rota.parada[index].nome,
-            style: TextStyle(fontSize: 18),
+            style: const TextStyle(fontSize: 18),
           ),
           subtitle: Text(
             rota.parada[index].latitude.toString() +
                 ' | ' +
                 rota.parada[index].longitude.toString(),
-            style: TextStyle(fontSize: 14),
+            style: const TextStyle(fontSize: 14),
           ),
         );
       },
       itemCount: rota.parada.length,
     );
+  }
+
+  Future<Parada> detalhesParada(
+    Rota rota,
+    LatLng posParada,
+    LatLng posBusao,
+    LatLng posUsuario,
+  ) async {
+    String travelModeBusao = "driving";
+    String travelModeUsuario = "walking";
+    Parada parada = Parada();
+    List<Placemark> lugares =
+        await placemarkFromCoordinates(posParada.latitude, posParada.longitude);
+    parada.thoroughfare = lugares.first.thoroughfare;
+    parada.subThoroughfare = lugares.first.subThoroughfare;
+    // Do usuário até a parada
+    var retUsu = await Dio().get(
+        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
+            posUsuario.latitude.toString() +
+            ',' +
+            posUsuario.longitude.toString() +
+            '&origins=' +
+            posParada.latitude.toString() +
+            ',' +
+            posParada.longitude.toString() +
+            '&key=' +
+            DefaultFirebaseOptions.android.apiKey +
+            '&mode=' +
+            travelModeUsuario +
+            '&language=pt-BR');
+
+    // Do busão até a parada
+    var retBus = await Dio().get(
+        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
+            posBusao.latitude.toString() +
+            ',' +
+            posBusao.longitude.toString() +
+            '&origins=' +
+            posParada.latitude.toString() +
+            ',' +
+            posParada.longitude.toString() +
+            '&key=' +
+            DefaultFirebaseOptions.android.apiKey +
+            '&mode=' +
+            travelModeBusao +
+            '&language=pt-BR');
+    parada.tempoChegadaUsuario =
+        retUsu.data['rows'].first['elements'].first['duration']['text'];
+    parada.tempoChegadaBusao =
+        retBus.data['rows'].first['elements'].first['duration']['text'];
+    parada.distanciaAteUsuario =
+        retUsu.data['rows'].first['elements'].first['distance']['text'];
+    parada.distanciaAteBusao =
+        retBus.data['rows'].first['elements'].first['distance']['text'];
+    parada.latitude = posParada.latitude;
+    parada.longitude = posParada.longitude;
+    return parada;
+  }
+
+  Future<LatLng?> buscaParadaProxima(LatLng pos) async {
+    double distanciaMin = 100000;
+    double distanciaHaversine = 0;
+    LatLng? markerPosition;
+    // Busca a parada mais próxima da rota atual.
+    for (var i = 0; i < rotaAtual.parada.length - 1; i++) {
+      distanciaHaversine = Haversine.haversine(
+        pos.latitude,
+        pos.longitude,
+        rotaAtual.parada[i].latitude,
+        rotaAtual.parada[i].longitude,
+      );
+      if (distanciaHaversine < distanciaMin) {
+        distanciaMin = distanciaHaversine;
+        markerPosition = LatLng(
+          rotaAtual.parada[i].latitude,
+          rotaAtual.parada[i].longitude,
+        );
+      }
+    }
+    return markerPosition;
+  }
+
+  _getStremRealtimeBusao(Rota rota) {
+    DatabaseReference ref =
+        FirebaseDatabase.instance.ref('localizacaoBusao/' + rota.id);
+    _currentPositionStreamBusao =
+        ref.onValue.listen((DatabaseEvent event) async {
+      Map<dynamic, dynamic> tempBusao =
+          event.snapshot.value as Map<dynamic, dynamic>;
+      busaoAtual = Busao.fromMap(tempBusao);
+
+      if (mostraParadaAtual) {
+        var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
+            const ImageConfiguration(size: Size(100, 100)), "assets/busao.png");
+        detalhesParada(
+                rotaAtual,
+                LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
+                LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+                _initialLocation.target)
+            .then((value) {
+          setState(() {
+            paradaAtual = value;
+            markers.add(Marker(
+              // rotation: ,
+              markerId: const MarkerId('busao'),
+              icon: iconMarkerBusao,
+              position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+            ));
+          });
+        });
+      }
+    });
   }
 }

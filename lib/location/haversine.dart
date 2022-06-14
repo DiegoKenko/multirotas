@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:math' show pow, sin, asin, sqrt, pi, cos;
 //https://github.com/shawnchan2014/haversine-dart/blob/master/Haversine.dart
 
 class Haversine {
