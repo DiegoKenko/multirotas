@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:multirotas/class/busao.dart';
 import 'package:multirotas/class/rota.dart';
 import 'package:multirotas/firebase/firestore.dart';
 import 'package:dio/dio.dart';
+import 'package:multirotas/firebase/realtime.dart';
 import 'package:multirotas/firebase_options.dart';
 import 'package:multirotas/location/haversine.dart';
 
@@ -32,9 +35,11 @@ class _MapViewState extends State<MapView> {
   bool cameraDinamica = false;
   bool mostraRotaAtual = false;
   bool mostraParadaAtual = false;
+  bool mostraBusaoAtual = false;
   bool ida = true;
   bool mapTapAllowed = false;
   StreamSubscription<Position>? _currentPositionStream;
+  StreamSubscription<DatabaseEvent>? _currentPositionStreamBusao;
   CameraPosition _initialLocation = const CameraPosition(
     target: LatLng(latMulti, longMult), // Multitécnica
     zoom: 16,
@@ -49,12 +54,18 @@ class _MapViewState extends State<MapView> {
   Set<Marker> markers = {};
   Set<Circle> circles = {};
   late Rota rotaAtual;
+
+  late Busao busaoAtual;
   late Parada paradaAtual = Parada();
+  Marker markerM = const Marker(markerId: MarkerId('mt'), visible: false);
+  Marker markersBusao =
+      const Marker(markerId: MarkerId('busao'), visible: false);
   TextEditingController buscaControllerDestino = TextEditingController();
   @override
   void initState() {
     super.initState();
     _getStremLocation();
+    markerMulti();
     // Deve ser executado depois do _getStremLocation
     getRotas();
   }
@@ -63,6 +74,8 @@ class _MapViewState extends State<MapView> {
   void dispose() {
     _currentPositionStream?.cancel();
     _currentPositionStream = null;
+    _currentPositionStreamBusao?.cancel();
+    _currentPositionStreamBusao = null;
     mapController.dispose();
     super.dispose();
   }
@@ -98,7 +111,11 @@ class _MapViewState extends State<MapView> {
                       onChanged: (bool value) {
                         setState(() {
                           ida = value;
-                          limpaMarcacoes();
+                          mostraRotaAtual = false;
+                          mostraBusaoAtual = false;
+                          mostraParadaAtual = false;
+                          polylines.clear();
+                          markers.clear();
                         });
                       },
                     ),
@@ -139,7 +156,6 @@ class _MapViewState extends State<MapView> {
                       suffixIcon: IconButton(
                         icon: const Icon(Icons.search, color: Colors.white),
                         onPressed: () {
-                          limpaMarcacoes();
                           FocusScope.of(context).unfocus(); // esconder teclado
                           buscaRotaPorEndereco();
                         },
@@ -171,22 +187,22 @@ class _MapViewState extends State<MapView> {
                       const ImageConfiguration(size: Size(100, 100)),
                       "assets/paradaMap.png");
                   Parada paradaAtualTemp;
-                  Marker markerM = await markerMulti();
                   LatLng? paradaLatLng = await buscaParadaProxima(pos);
+
                   paradaAtualTemp = await detalhesParada(
                       rotaAtual,
                       paradaLatLng!,
-                      const LatLng(latMulti, longMult),
+                      LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
                       _initialLocation.target);
+
                   if (paradaAtual != paradaAtualTemp) {
                     setState(
                       () {
                         paradaAtual = paradaAtualTemp;
                         mostraParadaAtual = true;
+                        // reseta marcadores
+                        //limpaMarcacoes();
 
-                        // Adiciona marcadores
-                        markers.clear();
-                        markers.add(markerM);
                         markers.add(
                           Marker(
                             anchor: const Offset(0.5, 0.5),
@@ -276,8 +292,11 @@ class _MapViewState extends State<MapView> {
                                 setState(() {
                                   mostraRotaAtual = false;
                                   mapTapAllowed = false;
-                                  limpaMarcacoes();
                                 });
+                                /* limpaMarcacoes(
+                                    polyline: true,
+                                    busaoStream: true,
+                                    paradaPosition: true); */
                               },
                               icon: const Icon(
                                 Icons.close_rounded,
@@ -470,8 +489,10 @@ class _MapViewState extends State<MapView> {
           ),
         );
       }
+
       if (ida) {
         _rotasProximasIda();
+        if (mostraBusaoAtual && mostraParadaAtual && mostraRotaAtual) {}
         setState(() {
           attCircle(LatLng(_initialLocation.target.latitude,
               _initialLocation.target.longitude));
@@ -558,16 +579,14 @@ class _MapViewState extends State<MapView> {
           color: const Color(0xFF373D69),
         ),
         onTap: () {
-          limpaMarcacoes();
           if (ida || rota.parada.isNotEmpty) {
             mapTapAllowed = true;
             rotaAtual = todasRotas.firstWhere(
               (element) => (element.id == rota.id),
             );
+            _getStremRealtimeBusao(rotaAtual);
+            mostraRotaAtual = true;
             montaPolyline(rotaAtual);
-            setState(() {
-              mostraRotaAtual = true;
-            });
           }
         },
       ),
@@ -590,10 +609,10 @@ class _MapViewState extends State<MapView> {
     });
   }
 
-  Future<Marker> markerMulti() async {
+  void markerMulti() async {
     var iconMarkerMulti = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/mtMap.png");
-    return Marker(
+    markerM = Marker(
       markerId: const MarkerId('mt'),
       position: const LatLng(latMulti, longMult),
       infoWindow: const InfoWindow(
@@ -638,9 +657,9 @@ class _MapViewState extends State<MapView> {
             10)
         .then(
       (value) {
-        limpaMarcacoes();
         setState(
           () {
+            //(polyline: true, busaoStream: true);
             polylines[value.polylineId] = value;
           },
         );
@@ -689,7 +708,7 @@ class _MapViewState extends State<MapView> {
     ));
 
     setState(() {
-      limpaMarcacoes();
+      polylines.clear();
       markers = markerVolta;
       cameraDinamica = false;
       mapController.animateCamera(
@@ -708,7 +727,6 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _rotasProximasVolta(LatLng pos) async {
-    final markerMult = await markerMulti();
     final markerDestino = Marker(
       markerId: MarkerId(pos.toString()),
       position: LatLng(pos.latitude, pos.longitude),
@@ -753,7 +771,7 @@ class _MapViewState extends State<MapView> {
       }
     }
     setState(() {
-      tempMarker.add(markerMult);
+      tempMarker.add(markerM);
       tempMarker.add(markerDestino);
       markers = tempMarker;
     });
@@ -859,8 +877,19 @@ class _MapViewState extends State<MapView> {
     return markerPosition;
   }
 
-  void limpaMarcacoes() {
-    markers.clear();
-    polylines.clear();
+  _getStremRealtimeBusao(Rota rota) {
+    DatabaseReference ref =
+        FirebaseDatabase.instance.ref('localizacaoBusao/' + rota.id);
+    _currentPositionStreamBusao = ref.onValue.listen((DatabaseEvent event) {
+      Map<dynamic, dynamic> tempBusao =
+          event.snapshot.value as Map<dynamic, dynamic>;
+      busaoAtual = Busao.fromMap(tempBusao);
+      setState(() {
+        markers.add(Marker(
+          markerId: const MarkerId('busao'),
+          position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+        ));
+      });
+    });
   }
 }
