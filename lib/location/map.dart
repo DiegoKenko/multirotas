@@ -202,6 +202,7 @@ class _MapViewState extends State<MapView> {
               onMapCreated: (GoogleMapController controller) {
                 mapController = controller;
                 changeMapMode(mapController);
+                markers.add(markerM);
               },
               onTap: (pos) async {
                 if (mapTapAllowed && ida) {
@@ -618,6 +619,7 @@ class _MapViewState extends State<MapView> {
         ),
         onTap: () {
           if (ida || rota.parada.isNotEmpty) {
+            mostraParadaAtual = false;
             mapTapAllowed = true;
             rotaAtual = todasRotas.firstWhere(
               (element) => (element.id == rota.id),
@@ -680,7 +682,7 @@ class _MapViewState extends State<MapView> {
   montaPolyline(Rota rota) {
     List<PolylineWayPoint> wayPoints = [];
     // Adiciona cada parada, exceto a primeira e a última
-    for (var i = 1; i < rota.parada.length - 1; i++) {
+    for (var i = 0; i < rota.parada.length - 1; i++) {
       wayPoints.add(
         PolylineWayPoint(
           location: rota.parada[i].latitude.toString() +
@@ -692,8 +694,8 @@ class _MapViewState extends State<MapView> {
     _createPolylines(
             rota.parada[0].latitude,
             rota.parada[0].longitude,
-            rota.parada[rota.parada.length - 1].latitude,
-            rota.parada[rota.parada.length - 1].longitude,
+            ida ? latMulti : rota.parada[rota.parada.length - 1].latitude,
+            ida ? longMult : rota.parada[rota.parada.length - 1].longitude,
             rota.nome,
             wayPoints,
             rotaColor,
@@ -928,27 +930,15 @@ class _MapViewState extends State<MapView> {
       Map<dynamic, dynamic> tempBusao =
           event.snapshot.value as Map<dynamic, dynamic>;
       busaoAtual = Busao.fromMap(tempBusao);
+      var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
+          const ImageConfiguration(size: Size(100, 100)), "assets/busao.png");
 
-      if (mostraParadaAtual) {
-        var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
-            const ImageConfiguration(size: Size(100, 100)), "assets/busao.png");
-        detalhesParada(
-                rotaAtual,
-                LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
-                LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-                _initialLocation.target)
-            .then((value) {
-          setState(() {
-            paradaAtual = value;
-            markers.add(Marker(
-              // rotation: ,
-              markerId: const MarkerId('busao'),
-              icon: iconMarkerBusao,
-              position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-            ));
-          });
-        });
-      }
+      markers.add(Marker(
+        // rotation: ,
+        markerId: const MarkerId('busao'),
+        icon: iconMarkerBusao,
+        position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+      ));
     });
   }
 }
