@@ -38,6 +38,7 @@ import 'package:dio/dio.dart' show Dio;
 import 'package:multirotas/firebase_options.dart' show DefaultFirebaseOptions;
 import 'package:multirotas/location/haversine.dart';
 import 'package:multirotas/class/parada.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class MapView extends StatefulWidget {
   const MapView({Key? key}) : super(key: key);
@@ -76,7 +77,6 @@ class _MapViewState extends State<MapView> {
   Set<Marker> markers = {};
   Set<Circle> circles = {};
   late Rota rotaAtual;
-
   late Busao busaoAtual;
   late Parada paradaAtual = Parada();
   Marker markerM = const Marker(markerId: MarkerId('mt'), visible: false);
@@ -118,6 +118,9 @@ class _MapViewState extends State<MapView> {
             child: Padding(
               padding: const EdgeInsets.only(top: 80),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.start,
                 children: [
                   ListTile(
                     leading: const Text(
@@ -143,24 +146,49 @@ class _MapViewState extends State<MapView> {
                     ),
                   ),
                   ListTile(
-                      leading: const Text(
-                        'Estilo do mapa ',
-                        style: TextStyle(
-                          color: Colors.white,
+                    leading: const Text(
+                      'Estilo do mapa ',
+                      style: TextStyle(
+                        color: Colors.white,
+                      ),
+                    ),
+                    trailing: IconButton(
+                      onPressed: () {
+                        setState(() {
+                          normalMap = !normalMap;
+                        });
+                      },
+                      icon: Icon(
+                        Icons.map,
+                        color: normalMap ? Colors.grey : Colors.amber,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.bottomLeft,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: FutureBuilder(
+                          future: PackageInfo.fromPlatform(),
+                          builder:
+                              (context, AsyncSnapshot<PackageInfo> snapshot) {
+                            if (snapshot.hasData) {
+                              return Text(
+                                'Versão ' + snapshot.data!.version,
+                                style: TextStyle(
+                                  color: Colors.yellow,
+                                ),
+                              );
+                            } else {
+                              return Container();
+                            }
+                          },
                         ),
                       ),
-                      trailing: IconButton(
-                          onPressed: () {
-                            setState(() {
-                              normalMap = !normalMap;
-                            });
-                          },
-                          icon: Icon(
-                            Icons.map,
-                            color: normalMap ? Colors.grey : Colors.amber,
-                          )))
+                    ),
+                  ),
                 ],
-                mainAxisAlignment: MainAxisAlignment.start,
               ),
             ),
           ),
@@ -213,10 +241,10 @@ class _MapViewState extends State<MapView> {
                   LatLng? paradaLatLng = await buscaParadaProxima(pos);
 
                   paradaAtualTemp = await detalhesParada(
-                      rotaAtual,
-                      paradaLatLng!,
-                      LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-                      _initialLocation.target);
+                    rotaAtual,
+                    paradaLatLng!,
+                    LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+                  );
 
                   if (paradaAtual != paradaAtualTemp) {
                     setState(
@@ -846,34 +874,18 @@ class _MapViewState extends State<MapView> {
     Rota rota,
     LatLng posParada,
     LatLng posBusao,
-    LatLng posUsuario,
   ) async {
     String travelModeBusao = "driving";
-    String travelModeUsuario = "walking";
     Parada parada = Parada();
     List<Placemark> lugares =
         await placemarkFromCoordinates(posParada.latitude, posParada.longitude);
     parada.thoroughfare = lugares.first.thoroughfare;
     parada.subThoroughfare = lugares.first.subThoroughfare;
-    // Do usuário até a parada
-    var retUsu = await Dio().get(
-        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
-            posUsuario.latitude.toString() +
-            ',' +
-            posUsuario.longitude.toString() +
-            '&origins=' +
-            posParada.latitude.toString() +
-            ',' +
-            posParada.longitude.toString() +
-            '&key=' +
-            DefaultFirebaseOptions.android.apiKey +
-            '&mode=' +
-            travelModeUsuario +
-            '&language=pt-BR');
 
     // Do busão até a parada
     var retBus = await Dio().get(
-        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
+        'https://maps.googleapis.com/maps/api/distancematrix/json' +
+            '?destinations=' +
             posBusao.latitude.toString() +
             ',' +
             posBusao.longitude.toString() +
@@ -886,12 +898,9 @@ class _MapViewState extends State<MapView> {
             '&mode=' +
             travelModeBusao +
             '&language=pt-BR');
-    parada.tempoChegadaUsuario =
-        retUsu.data['rows'].first['elements'].first['duration']['text'];
+
     parada.tempoChegadaBusao =
         retBus.data['rows'].first['elements'].first['duration']['text'];
-    parada.distanciaAteUsuario =
-        retUsu.data['rows'].first['elements'].first['distance']['text'];
     parada.distanciaAteBusao =
         retBus.data['rows'].first['elements'].first['distance']['text'];
     parada.latitude = posParada.latitude;
@@ -933,8 +942,18 @@ class _MapViewState extends State<MapView> {
       var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
           const ImageConfiguration(size: Size(100, 100)), "assets/busao.png");
 
+      if (mapTapAllowed && mostraParadaAtual && ida) {
+        Parada paradaAtualTemp;
+        paradaAtualTemp = await detalhesParada(
+          rotaAtual,
+          LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
+          LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+        );
+        setState(() {
+          paradaAtual = paradaAtualTemp;
+        });
+      }
       markers.add(Marker(
-        // rotation: ,
         markerId: const MarkerId('busao'),
         icon: iconMarkerBusao,
         position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
