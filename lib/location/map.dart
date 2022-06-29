@@ -939,9 +939,12 @@ class _MapViewState extends State<MapView> {
       Map<dynamic, dynamic> tempBusao =
           event.snapshot.value as Map<dynamic, dynamic>;
       busaoAtual = Busao.fromMap(tempBusao);
-      var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
-          const ImageConfiguration(size: Size(100, 100)), "assets/busao.png");
 
+      var iconMarkerBusao = await BitmapDescriptor.fromAssetImage(
+          const ImageConfiguration(
+            size: Size(100, 100),
+          ),
+          "assets/busao.png");
       if (mapTapAllowed && mostraParadaAtual && ida) {
         Parada paradaAtualTemp;
         paradaAtualTemp = await detalhesParada(
@@ -954,6 +957,9 @@ class _MapViewState extends State<MapView> {
         });
       }
       markers.add(Marker(
+        rotation: busaoAtual.heading! <= 90
+            ? busaoAtual.heading! - 90
+            : busaoAtual.heading! - 90 + 360,
         markerId: const MarkerId('busao'),
         icon: iconMarkerBusao,
         position: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
