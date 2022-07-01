@@ -83,13 +83,15 @@ class _MapViewState extends State<MapView> {
   Marker markersBusao =
       const Marker(markerId: MarkerId('busao'), visible: false);
   TextEditingController buscaControllerDestino = TextEditingController();
+  int contadorAttDetalhes = 0;
+
   @override
   void initState() {
     super.initState();
-    _getStremLocation();
-    markerMulti();
-    // Deve ser executado depois do _getStremLocation
-    getRotas();
+    _getStremLocation(); // Att localização do usuário
+    markerMulti(); // Att marcador
+    // Busca todas ritas
+    getRotas(); // Deve ser executado depois do _getStremLocation
   }
 
   @override
@@ -502,13 +504,14 @@ class _MapViewState extends State<MapView> {
     );
   }
 
+  // Busca todas rotas disponíveis.
   getRotas() async {
     todasRotas = await Firestore().todasRotas();
   }
 
   // Atualização da localização como stream.
-  // É possível utilizar 'await Geolocator.getCurrentPosition'
   _getStremLocation() async {
+    // Busca a localização atual ao iniciar o App.
     Geolocator.getCurrentPosition().then(
       (value) => {
         _initialLocation = CameraPosition(
@@ -533,39 +536,51 @@ class _MapViewState extends State<MapView> {
         )
       },
     );
+
+    // Busca localização como stream.
     _currentPositionStream = Geolocator.getPositionStream(
       intervalDuration: const Duration(seconds: 5),
       desiredAccuracy: LocationAccuracy.high,
-    ).listen((event) {
-      _initialLocation = CameraPosition(
-        target: LatLng(
-          event.latitude,
-          event.longitude,
-        ),
-      );
-      if (cameraDinamica) {
-        mapController.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: LatLng(
-                _initialLocation.target.latitude,
-                _initialLocation.target.longitude,
-              ),
-              zoom: 16,
-            ),
+    ).listen(
+      (event) {
+        //Mudança do local.
+        _initialLocation = CameraPosition(
+          target: LatLng(
+            event.latitude,
+            event.longitude,
           ),
         );
-      }
 
-      if (ida) {
-        _rotasProximasIda();
-        if (mostraBusaoAtual && mostraParadaAtual && mostraRotaAtual) {}
-        setState(() {
-          attCircle(LatLng(_initialLocation.target.latitude,
-              _initialLocation.target.longitude));
-        });
-      }
-    });
+        // Mudança do foco da câmera.
+        if (cameraDinamica) {
+          mapController.animateCamera(
+            CameraUpdate.newCameraPosition(
+              CameraPosition(
+                target: LatLng(
+                  _initialLocation.target.latitude,
+                  _initialLocation.target.longitude,
+                ),
+                zoom: 16,
+              ),
+            ),
+          );
+        }
+
+        //
+        if (ida) {
+          // Atualiza rotas próximas
+          _rotasProximasIda();
+
+          if (mostraBusaoAtual && mostraParadaAtual && mostraRotaAtual) {}
+          setState(
+            () {
+              attCircle(LatLng(_initialLocation.target.latitude,
+                  _initialLocation.target.longitude));
+            },
+          );
+        }
+      },
+    );
   }
 
   Future<Polyline> _createPolylines(
@@ -649,13 +664,17 @@ class _MapViewState extends State<MapView> {
           if (ida || rota.parada.isNotEmpty) {
             mostraParadaAtual = false;
             mapTapAllowed = true;
+            // Busca todos dados da rota.
             rotaAtual = todasRotas.firstWhere(
               (element) => (element.id == rota.id),
             );
+
+            //Recebe localização do busão como stream.
             _getStremRealtimeBusao(rotaAtual);
             mostraRotaAtual = true;
-            polylines.clear();
 
+            // Atualiza markers e polylines
+            polylines.clear();
             markers.removeWhere((element) => element.markerId.value == 'busao');
             markers.removeWhere(
                 (element) => element.markerId.value == 'nearestMarker');
@@ -666,9 +685,9 @@ class _MapViewState extends State<MapView> {
     );
   }
 
+  // Busca as rotas próximas de acordo com a localização do usuário.
   Future<void> _rotasProximasIda() async {
     List<Rota> todasRotasTemp = [];
-
     List<Rota> rotasProximas = await Firestore().rotasProximas(
         double.parse(_initialLocation.target.latitude.toString()),
         double.parse(_initialLocation.target.longitude.toString()),
@@ -682,6 +701,7 @@ class _MapViewState extends State<MapView> {
     });
   }
 
+  // Atualiza marcador que indica a localização da Multitécnica.
   void markerMulti() async {
     var iconMarkerMulti = await BitmapDescriptor.fromAssetImage(
         const ImageConfiguration(size: Size(100, 100)), "assets/mtMap.png");
@@ -695,6 +715,7 @@ class _MapViewState extends State<MapView> {
     );
   }
 
+  // Atualiza posição visual do raio de busca.
   attCircle(LatLng latLng) {
     circles = {
       Circle(
@@ -934,6 +955,7 @@ class _MapViewState extends State<MapView> {
   _getStremRealtimeBusao(Rota rota) {
     DatabaseReference ref =
         FirebaseDatabase.instance.ref('localizacaoBusao/' + rota.id);
+    _currentPositionStreamBusao = null;
     _currentPositionStreamBusao =
         ref.onValue.listen((DatabaseEvent event) async {
       Map<dynamic, dynamic> tempBusao =
@@ -946,16 +968,21 @@ class _MapViewState extends State<MapView> {
           ),
           "assets/busao.png");
       if (mapTapAllowed && mostraParadaAtual && ida) {
-        Parada paradaAtualTemp;
-        paradaAtualTemp = await detalhesParada(
-          rotaAtual,
-          LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
-          LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-        );
-        setState(() {
-          paradaAtual = paradaAtualTemp;
-        });
+        // A atualização do tempo/distância do busão é feita apenas a cada 6 atualizações de localização do busão.
+        contadorAttDetalhes++;
+        if (contadorAttDetalhes % 4 == 0) {
+          Parada paradaAtualTemp;
+          paradaAtualTemp = await detalhesParada(
+            rotaAtual,
+            LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
+            LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+          );
+          setState(() {
+            paradaAtual = paradaAtualTemp;
+          });
+        }
       }
+
       markers.add(Marker(
         rotation: busaoAtual.heading! <= 90
             ? busaoAtual.heading! - 90
