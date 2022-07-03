@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart' show FirebaseFirestore;
-import 'package:multirotas/class/rota.dart';
+import 'package:multirotas/class/rota_class.dart';
 import 'package:multirotas/location/haversine.dart';
 
 class Firestore {
@@ -35,22 +35,22 @@ class Firestore {
         .get();
     for (var element in x.docs) {
       Rota r = Rota.fromMap(element.data());
-      for (var p = r.parada.length - 1; p >= 0; p--) {
+      for (var p = r.parada!.length - 1; p >= 0; p--) {
         // se está fora do raio mínimo, remove da lista
-        if (Haversine.haversine(latPosAtual, longPosAtual, r.parada[p].latitude,
-                r.parada[p].longitude) >
+        if (Haversine.haversine(latPosAtual, longPosAtual,
+                r.parada![p].latitude, r.parada![p].longitude) >
             raioKm) {
-          r.parada.removeAt(p);
+          r.parada!.removeAt(p);
         } else {
           // desconsidera paradas no raio de 1km da Multi
-          if (Haversine.haversine(latMulti, longMulti, r.parada[p].latitude,
-                  r.parada[p].longitude) <=
+          if (Haversine.haversine(latMulti, longMulti, r.parada![p].latitude,
+                  r.parada![p].longitude) <=
               distanciaMinMulti) {
-            r.parada.removeAt(p);
+            r.parada!.removeAt(p);
           }
         }
       }
-      if (r.parada.isNotEmpty) {
+      if (r.parada!.isNotEmpty) {
         rotas.add(r);
       }
     }

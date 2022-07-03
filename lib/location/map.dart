@@ -31,13 +31,13 @@ import 'package:google_maps_flutter/google_maps_flutter.dart'
         CircleId;
 import 'package:geolocator/geolocator.dart'
     show Position, Geolocator, LocationAccuracy;
-import 'package:multirotas/class/busao.dart';
-import 'package:multirotas/class/rota.dart';
+import 'package:multirotas/class/busao_class.dart';
+import 'package:multirotas/class/rota_class.dart';
 import 'package:multirotas/firebase/firestore.dart' show Firestore;
 import 'package:dio/dio.dart' show Dio;
 import 'package:multirotas/firebase_options.dart' show DefaultFirebaseOptions;
 import 'package:multirotas/location/haversine.dart';
-import 'package:multirotas/class/parada.dart';
+import 'package:multirotas/class/parada_class.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class MapView extends StatefulWidget {
@@ -76,9 +76,9 @@ class _MapViewState extends State<MapView> {
   List rotasProximas = [];
   Set<Marker> markers = {};
   Set<Circle> circles = {};
-  late Rota rotaAtual;
-  late Busao busaoAtual;
-  late Parada paradaAtual = Parada();
+  Rota rotaAtual = Rota();
+  Busao busaoAtual = Busao();
+  Parada paradaAtual = Parada();
   Marker markerM = const Marker(markerId: MarkerId('mt'), visible: false);
   Marker markersBusao =
       const Marker(markerId: MarkerId('busao'), visible: false);
@@ -111,394 +111,412 @@ class _MapViewState extends State<MapView> {
     return SizedBox(
       height: height,
       width: width,
-      child: Scaffold(
-        drawerScrimColor: const Color.fromARGB(144, 0, 0, 0),
-        drawer: Drawer(
-          elevation: 2,
-          backgroundColor: const Color.fromARGB(255, 55, 61, 105),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 80),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisSize: MainAxisSize.max,
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  ListTile(
-                    leading: const Text(
-                      'Caminho de ida até a Multitécnica',
-                      style: TextStyle(
-                        color: Colors.white,
+      child: WillPopScope(
+        onWillPop: () async => false,
+        child: Scaffold(
+          drawerScrimColor: const Color.fromARGB(144, 0, 0, 0),
+          drawer: Drawer(
+            elevation: 2,
+            backgroundColor: const Color.fromARGB(255, 55, 61, 105),
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 80),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    ListTile(
+                      leading: const Text(
+                        'Caminho de ida até a Multitécnica',
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
+                      ),
+                      trailing: Switch(
+                        inactiveThumbColor: Colors.white,
+                        activeColor: Colors.green,
+                        value: ida,
+                        onChanged: (bool value) {
+                          setState(() {
+                            ida = value;
+                            mostraRotaAtual = false;
+                            mostraBusaoAtual = false;
+                            mostraParadaAtual = false;
+                            polylines.clear();
+                            markers.clear();
+                          });
+                        },
                       ),
                     ),
-                    trailing: Switch(
-                      inactiveThumbColor: Colors.white,
-                      activeColor: Colors.green,
-                      value: ida,
-                      onChanged: (bool value) {
-                        setState(() {
-                          ida = value;
-                          mostraRotaAtual = false;
-                          mostraBusaoAtual = false;
-                          mostraParadaAtual = false;
-                          polylines.clear();
-                          markers.clear();
-                        });
-                      },
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Text(
-                      'Estilo do mapa ',
-                      style: TextStyle(
-                        color: Colors.white,
+                    ListTile(
+                      leading: const Text(
+                        'Estilo do mapa ',
+                        style: TextStyle(
+                          color: Colors.white,
+                        ),
                       ),
-                    ),
-                    trailing: IconButton(
-                      onPressed: () {
-                        setState(() {
-                          normalMap = !normalMap;
-                        });
-                      },
-                      icon: Icon(
-                        Icons.map,
-                        color: normalMap ? Colors.grey : Colors.amber,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Align(
-                      alignment: Alignment.bottomLeft,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: FutureBuilder(
-                          future: PackageInfo.fromPlatform(),
-                          builder:
-                              (context, AsyncSnapshot<PackageInfo> snapshot) {
-                            if (snapshot.hasData) {
-                              return Text(
-                                'Versão ' + snapshot.data!.version,
-                                style: TextStyle(
-                                  color: Colors.yellow,
-                                ),
-                              );
-                            } else {
-                              return Container();
-                            }
-                          },
+                      trailing: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            normalMap = !normalMap;
+                          });
+                        },
+                        icon: Icon(
+                          Icons.map,
+                          color: normalMap ? Colors.grey : Colors.amber,
                         ),
                       ),
                     ),
-                  ),
-                ],
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomLeft,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: FutureBuilder(
+                            future: PackageInfo.fromPlatform(),
+                            builder:
+                                (context, AsyncSnapshot<PackageInfo> snapshot) {
+                              if (snapshot.hasData) {
+                                return Text(
+                                  'Versão ' + snapshot.data!.version,
+                                  style: const TextStyle(
+                                    color: Colors.yellow,
+                                  ),
+                                );
+                              } else {
+                                return Container();
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF373D69),
-          actions: const [],
-          title: ida
-              ? Container()
-              : Center(
-                  child: TextField(
-                    style: const TextStyle(color: Colors.white),
-                    controller: buscaControllerDestino,
-                    decoration: InputDecoration(
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.search, color: Colors.white),
-                        onPressed: () {
-                          FocusScope.of(context).unfocus(); // esconder teclado
-                          buscaRotaPorEndereco();
-                        },
-                      ),
-                      hintText: 'destino...',
-                      hintStyle: const TextStyle(
-                        color: Colors.white,
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF373D69),
+            actions: const [],
+            title: ida
+                ? Container()
+                : Center(
+                    child: TextField(
+                      style: const TextStyle(color: Colors.white),
+                      controller: buscaControllerDestino,
+                      decoration: InputDecoration(
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.search, color: Colors.white),
+                          onPressed: () {
+                            FocusScope.of(context)
+                                .unfocus(); // esconder teclado
+                            buscaRotaPorEndereco();
+                          },
+                        ),
+                        hintText: 'destino...',
+                        hintStyle: const TextStyle(
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ),
-                ),
-        ),
-        body: Stack(
-          alignment: AlignmentDirectional.bottomEnd,
-          children: [
-            GoogleMap(
-              onCameraMove: (position) {
-                setState(() {
-                  cameraDinamica = false;
-                });
-              },
-              onMapCreated: (GoogleMapController controller) {
-                mapController = controller;
-                changeMapMode(mapController);
-                markers.add(markerM);
-              },
-              onTap: (pos) async {
-                if (mapTapAllowed && ida) {
-                  var iconMarkerParada = await BitmapDescriptor.fromAssetImage(
-                      const ImageConfiguration(size: Size(100, 100)),
-                      "assets/paradaMap.png");
-                  Parada paradaAtualTemp;
-                  LatLng? paradaLatLng = await buscaParadaProxima(pos);
+          ),
+          body: Stack(
+            alignment: AlignmentDirectional.bottomEnd,
+            children: [
+              GoogleMap(
+                onCameraMove: (position) {
+                  setState(() {
+                    cameraDinamica = false;
+                  });
+                },
+                onMapCreated: (GoogleMapController controller) {
+                  mapController = controller;
+                  changeMapMode(mapController);
+                  markers.add(markerM);
+                },
+                onTap: (pos) async {
+                  if (mapTapAllowed && ida) {
+                    // Busca parada mais próxima do toque.
+                    LatLng? paradaLatLng = await buscaParadaProxima(pos);
 
-                  paradaAtualTemp = await detalhesParada(
-                    rotaAtual,
-                    paradaLatLng!,
-                    LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
-                  );
+                    // Adiciona as paradas para calcular o tempo/distância
+                    List<LatLng> paradasCaminho = [];
+                    bool parAntes = true;
+                    int contAntes = 0;
+                    // Somente será considerados as paradas anterior a parada atual
+                    for (var element in rotaAtual.parada!) {
+                      if (element.latitude == paradaLatLng!.latitude &&
+                          element.longitude == paradaLatLng.longitude) {
+                        parAntes = false;
+                      }
+                      if (parAntes && contAntes % 3 == 0) {
+                        paradasCaminho
+                            .add(LatLng(element.latitude!, element.longitude!));
+                      }
+                      contAntes++;
+                    }
 
-                  if (paradaAtual != paradaAtualTemp) {
-                    setState(
-                      () {
-                        paradaAtual = paradaAtualTemp;
-                        mostraParadaAtual = true;
-                        // reseta marcadores
-                        //limpaMarcacoes();
+                    var iconMarkerParada =
+                        await BitmapDescriptor.fromAssetImage(
+                            const ImageConfiguration(size: Size(100, 100)),
+                            "assets/paradaMap.png");
 
-                        markers.add(
-                          Marker(
-                            anchor: const Offset(0.5, 0.5),
-                            markerId: const MarkerId("nearestMarker"),
-                            position: paradaLatLng,
-                            icon: iconMarkerParada,
-                          ),
-                        );
-                        // Cria polilynes
-                        /*    // Trajeto do usuário removido 
-                        _createPolylines(
-                                _initialLocation.target.latitude,
-                                _initialLocation.target.longitude,
-                                paradaAtual.latitude!,
-                                paradaAtual.longitude!,
-                                'trajetoUsuario',
-                                [],
-                                usuarioColor,
-                                5)
-                            .then((value) {
-                          polylines[value.polylineId] = value;
-                        }); */
-                        // Muda camera
-                        mapController.animateCamera(
-                          CameraUpdate.newCameraPosition(
-                            CameraPosition(
-                              target: LatLng(
-                                paradaLatLng.latitude,
-                                paradaLatLng.longitude,
-                              ),
-                              zoom: 16,
-                            ),
-                          ),
-                        );
-                      },
+                    // Busca tempo/distância.
+                    Parada paradaAtualTemp;
+                    paradaAtualTemp = await detalhesParada(
+                      destino: LatLng(
+                          paradaLatLng!.latitude, paradaLatLng.longitude),
+                      wayPoints: paradasCaminho,
+                      posBusao:
+                          LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
                     );
-                  }
-                }
-              },
-              markers: Set<Marker>.from(markers),
-              compassEnabled: true,
-              polylines: Set<Polyline>.of(polylines.values),
-              initialCameraPosition: _initialLocation,
-              myLocationEnabled: true,
-              myLocationButtonEnabled: false,
-              mapType: normalMap ? MapType.normal : MapType.satellite,
-              zoomGesturesEnabled: true,
-              zoomControlsEnabled: false,
-              circles: circles,
-            ),
-            Positioned(
-              top: 0,
-              left: 0,
-              bottom: MediaQuery.of(context).size.height * 0.7,
-              right: 0,
-              child: mostraRotaAtual
-                  ? Column(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: const Color.fromARGB(225, 255, 255, 255),
-                            border: Border.all(
-                                color: const Color(0xFF373D69), width: 2),
-                          ),
-                          child: ListTile(
-                            tileColor: Colors.amberAccent,
-                            title: Column(
-                              children: [
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text(
-                                    rotaAtual.nome,
-                                    style: const TextStyle(fontSize: 30),
-                                  ),
-                                ),
-                                mostraParadaAtual
-                                    ? Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Text(paradaAtual.thoroughfare! +
-                                            ', ' +
-                                            paradaAtual.subThoroughfare!),
-                                      )
-                                    : const Text(''),
-                              ],
+
+                    if (paradaAtual != paradaAtualTemp) {
+                      setState(
+                        () {
+                          paradaAtual = paradaAtualTemp;
+                          mostraParadaAtual = true;
+                          // reseta marcadores
+                          //limpaMarcacoes();
+
+                          markers.add(
+                            Marker(
+                              anchor: const Offset(0.5, 0.5),
+                              markerId: const MarkerId("nearestMarker"),
+                              position: paradaLatLng,
+                              icon: iconMarkerParada,
                             ),
-                            trailing: IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  polylines.clear();
-                                  markers.removeWhere((element) =>
-                                      element.markerId.value ==
-                                      'nearestMarker');
-                                  markers.removeWhere((element) =>
-                                      element.markerId.value == 'busao');
-                                  mostraRotaAtual = false;
-                                  mapTapAllowed = false;
-                                });
-                              },
-                              icon: const Icon(
-                                Icons.close_rounded,
-                                size: 35,
-                                color: Colors.red,
+                          );
+                          // Muda camera
+                          mapController.animateCamera(
+                            CameraUpdate.newCameraPosition(
+                              CameraPosition(
+                                target: LatLng(
+                                  paradaLatLng.latitude,
+                                  paradaLatLng.longitude,
+                                ),
+                                zoom: 16,
                               ),
                             ),
-                          ),
-                        ),
-                        if (mostraParadaAtual)
+                          );
+                        },
+                      );
+                    }
+                  }
+                },
+                markers: Set<Marker>.from(markers),
+                compassEnabled: true,
+                polylines: Set<Polyline>.of(polylines.values),
+                initialCameraPosition: _initialLocation,
+                myLocationEnabled: true,
+                myLocationButtonEnabled: false,
+                mapType: normalMap ? MapType.normal : MapType.satellite,
+                zoomGesturesEnabled: true,
+                zoomControlsEnabled: false,
+                circles: circles,
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                bottom: MediaQuery.of(context).size.height * 0.7,
+                right: 0,
+                child: mostraRotaAtual
+                    ? Column(
+                        children: [
                           Container(
                             decoration: BoxDecoration(
                               color: const Color.fromARGB(225, 255, 255, 255),
                               border: Border.all(
-                                  color: const Color(0xFF373D69), width: 1),
+                                  color: const Color(0xFF373D69), width: 2),
                             ),
-                            child: SizedBox(
-                              width: MediaQuery.of(context).size.width,
-                              height: 40,
-                              child: ListView(
-                                shrinkWrap: true,
-                                scrollDirection: Axis.horizontal,
+                            child: ListTile(
+                              tileColor: Colors.amberAccent,
+                              title: Column(
                                 children: [
-                                  const Padding(
-                                    padding: EdgeInsets.all(8.0),
-                                    child: Icon(Icons.directions_bus_rounded),
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.only(
-                                        top: 8, bottom: 8, left: 8),
-                                    child: Text(' A '),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      top: 8,
-                                      bottom: 8,
-                                    ),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
                                     child: Text(
-                                      paradaAtual.tempoChegadaBusao.toString(),
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: busaoColor,
+                                      rotaAtual.nome!,
+                                      style: const TextStyle(fontSize: 30),
+                                    ),
+                                  ),
+                                  mostraParadaAtual
+                                      ? Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(
+                                              paradaAtual.thoroughfare! +
+                                                  ', ' +
+                                                  paradaAtual.subThoroughfare!),
+                                        )
+                                      : const Text(''),
+                                ],
+                              ),
+                              trailing: IconButton(
+                                onPressed: () {
+                                  setState(() {
+                                    polylines.clear();
+                                    markers.removeWhere((element) =>
+                                        element.markerId.value ==
+                                        'nearestMarker');
+                                    markers.removeWhere((element) =>
+                                        element.markerId.value == 'busao');
+                                    mostraRotaAtual = false;
+                                    mapTapAllowed = false;
+                                  });
+                                },
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 35,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ),
+                          ),
+                          if (mostraParadaAtual)
+                            Container(
+                              decoration: BoxDecoration(
+                                color: const Color.fromARGB(225, 255, 255, 255),
+                                border: Border.all(
+                                    color: const Color(0xFF373D69), width: 1),
+                              ),
+                              child: SizedBox(
+                                width: MediaQuery.of(context).size.width,
+                                height: 40,
+                                child: ListView(
+                                  shrinkWrap: true,
+                                  scrollDirection: Axis.horizontal,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: Icon(Icons.directions_bus_rounded),
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.only(
+                                          top: 8, bottom: 8, left: 8),
+                                      child: Text(' A '),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                        top: 8,
+                                        bottom: 8,
+                                      ),
+                                      child: Text(
+                                        paradaAtual.tempoChegadaBusao
+                                            .toString(),
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: busaoColor,
+                                        ),
+                                      ),
+                                    ),
+                                    const Padding(
+                                      padding:
+                                          EdgeInsets.only(top: 8, bottom: 8),
+                                      child: Text(' e '),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: 8, bottom: 8),
+                                      child: Text(
+                                        paradaAtual.distanciaAteBusao
+                                            .toString(),
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: busaoColor),
+                                      ),
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.only(
+                                        top: 8,
+                                        bottom: 8,
+                                      ),
+                                      child:
+                                          Text(' até a parada selecionada. '),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else
+                            Container(),
+                        ],
+                      )
+                    : Container(),
+              ),
+              ida
+                  ? DraggableScrollableSheet(
+                      minChildSize: 0.1,
+                      initialChildSize: 0.1,
+                      maxChildSize: 0.5,
+                      builder: (BuildContext context,
+                          ScrollController scrollController) {
+                        return ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: todasRotasProximas.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == 0) {
+                              return Card(
+                                child: Padding(
+                                  padding:
+                                      const EdgeInsets.only(left: 5, right: 5),
+                                  child: Center(
+                                    child: Text(
+                                      'Rotas:'.toUpperCase(),
+                                      style: const TextStyle(
+                                        color: Color(0xFF373D69),
+                                        letterSpacing: 3,
                                       ),
                                     ),
                                   ),
-                                  const Padding(
-                                    padding: EdgeInsets.only(top: 8, bottom: 8),
-                                    child: Text(' e '),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                        top: 8, bottom: 8),
-                                    child: Text(
-                                      paradaAtual.distanciaAteBusao.toString(),
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: busaoColor),
-                                    ),
-                                  ),
-                                  const Padding(
-                                    padding: EdgeInsets.only(
-                                      top: 8,
-                                      bottom: 8,
-                                    ),
-                                    child: Text(' até a parada selecionada. '),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )
-                        else
-                          Container(),
-                      ],
+                                ),
+                                shadowColor: Colors.white,
+                                color: const Color.fromARGB(255, 240, 224, 4),
+                              );
+                            } else {
+                              return cardRota(todasRotasProximas[index - 1]);
+                            }
+                          },
+                        );
+                      },
                     )
                   : Container(),
-            ),
-            ida
-                ? DraggableScrollableSheet(
-                    minChildSize: 0.1,
-                    initialChildSize: 0.1,
-                    maxChildSize: 0.5,
-                    builder: (BuildContext context,
-                        ScrollController scrollController) {
-                      return ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: todasRotasProximas.length + 1,
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Card(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.only(left: 5, right: 5),
-                                child: Center(
-                                  child: Text(
-                                    'Rotas:'.toUpperCase(),
-                                    style: const TextStyle(
-                                      color: Color(0xFF373D69),
-                                      letterSpacing: 3,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              shadowColor: Colors.white,
-                              color: const Color.fromARGB(255, 240, 224, 4),
-                            );
-                          } else {
-                            return cardRota(todasRotasProximas[index - 1]);
-                          }
-                        },
-                      );
-                    },
-                  )
-                : Container(),
-            Positioned(
-              top: MediaQuery.of(context).size.height * 0.7,
-              left: MediaQuery.of(context).size.width * 0.75,
-              child: ClipOval(
-                child: SizedBox(
-                  child: ClipOval(
-                    child: Material(
-                      color: Colors.white54,
-                      child: InkWell(
-                        splashColor: Colors.blue,
-                        child: IconButton(
-                          icon: Icon(
-                            Icons.my_location,
-                            color: cameraDinamica
-                                ? const Color(0xFF373D69)
-                                : Colors.grey,
-                            size: 40,
+              Positioned(
+                top: MediaQuery.of(context).size.height * 0.7,
+                left: MediaQuery.of(context).size.width * 0.75,
+                child: ClipOval(
+                  child: SizedBox(
+                    child: ClipOval(
+                      child: Material(
+                        color: Colors.white54,
+                        child: InkWell(
+                          splashColor: Colors.blue,
+                          child: IconButton(
+                            icon: Icon(
+                              Icons.my_location,
+                              color: cameraDinamica
+                                  ? const Color(0xFF373D69)
+                                  : Colors.grey,
+                              size: 40,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                cameraDinamica = !cameraDinamica;
+                              });
+                            },
                           ),
-                          onPressed: () {
-                            setState(() {
-                              cameraDinamica = !cameraDinamica;
-                            });
-                          },
                         ),
                       ),
                     ),
+                    height: 70,
+                    width: 70,
                   ),
-                  height: 70,
-                  width: 70,
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -650,7 +668,7 @@ class _MapViewState extends State<MapView> {
         child: Card(
           child: Center(
             child: Text(
-              rota.nome.toUpperCase(),
+              rota.nome!.toUpperCase(),
               style: const TextStyle(
                 color: Colors.white,
                 letterSpacing: 2,
@@ -661,7 +679,7 @@ class _MapViewState extends State<MapView> {
           color: const Color(0xFF373D69),
         ),
         onTap: () {
-          if (ida || rota.parada.isNotEmpty) {
+          if (ida || rota.parada!.isNotEmpty) {
             mostraParadaAtual = false;
             mapTapAllowed = true;
             // Busca todos dados da rota.
@@ -731,21 +749,21 @@ class _MapViewState extends State<MapView> {
   montaPolyline(Rota rota) {
     List<PolylineWayPoint> wayPoints = [];
     // Adiciona cada parada, exceto a primeira e a última
-    for (var i = 0; i < rota.parada.length - 1; i++) {
+    for (var i = 0; i < rota.parada!.length - 1; i++) {
       wayPoints.add(
         PolylineWayPoint(
-          location: rota.parada[i].latitude.toString() +
+          location: rota.parada![i].latitude.toString() +
               ',' +
-              rota.parada[i].longitude.toString(),
+              rota.parada![i].longitude.toString(),
         ),
       );
     }
     _createPolylines(
-            rota.parada[0].latitude,
-            rota.parada[0].longitude,
-            ida ? latMulti : rota.parada[rota.parada.length - 1].latitude,
-            ida ? longMult : rota.parada[rota.parada.length - 1].longitude,
-            rota.nome,
+            rota.parada![0].latitude!,
+            rota.parada![0].longitude!,
+            ida ? latMulti : rota.parada![rota.parada!.length - 1].latitude!,
+            ida ? longMult : rota.parada![rota.parada!.length - 1].longitude!,
+            rota.nome!,
             wayPoints,
             rotaColor,
             7)
@@ -836,7 +854,7 @@ class _MapViewState extends State<MapView> {
         raioBuscaMetro / 1000,
         ida);
     for (var i = 0; i < rotasProximas.length; i++) {
-      for (var j = 0; j < rotasProximas[i].parada.length; j++) {
+      for (var j = 0; j < rotasProximas[i].parada!.length; j++) {
         Rota rotaTempProx = rotasProximas[i];
         Marker markTemp = Marker(
           zIndex: i * 10.0 + j,
@@ -850,14 +868,14 @@ class _MapViewState extends State<MapView> {
               cameraDinamica = false;
             });
           },
-          markerId: MarkerId(rotasProximas[i].nome + '|' + j.toString()),
-          position: LatLng(rotasProximas[i].parada[j].latitude,
-              rotasProximas[i].parada[j].longitude),
+          markerId: MarkerId(rotasProximas[i].nome! + '|' + j.toString()),
+          position: LatLng(rotasProximas[i].parada![j].latitude!,
+              rotasProximas[i].parada![j].longitude!),
           infoWindow: InfoWindow(
             title: rotasProximas[i].nome,
-            snippet: rotasProximas[i].parada[j].latitude.toString() +
+            snippet: rotasProximas[i].parada![j].latitude.toString() +
                 ' | ' +
-                rotasProximas[i].parada[j].longitude.toString(),
+                rotasProximas[i].parada![j].longitude.toString(),
           ),
           icon: iconMarkerParada,
         );
@@ -876,44 +894,52 @@ class _MapViewState extends State<MapView> {
       itemBuilder: (context, index) {
         return ListTile(
           title: Text(
-            rota.parada[index].nome,
+            rota.parada![index].nome!,
             style: const TextStyle(fontSize: 18),
           ),
           subtitle: Text(
-            rota.parada[index].latitude.toString() +
+            rota.parada![index].latitude.toString() +
                 ' | ' +
-                rota.parada[index].longitude.toString(),
+                rota.parada![index].longitude.toString(),
             style: const TextStyle(fontSize: 14),
           ),
         );
       },
-      itemCount: rota.parada.length,
+      itemCount: rota.parada!.length,
     );
   }
 
-  Future<Parada> detalhesParada(
-    Rota rota,
-    LatLng posParada,
-    LatLng posBusao,
-  ) async {
+  Future<Parada> detalhesParada({
+    required LatLng destino,
+    required List<LatLng> wayPoints,
+    required LatLng posBusao,
+  }) async {
     String travelModeBusao = "driving";
+    String wPointString = '';
     Parada parada = Parada();
-    List<Placemark> lugares =
-        await placemarkFromCoordinates(posParada.latitude, posParada.longitude);
+    List<Placemark> lugares = await placemarkFromCoordinates(
+        wayPoints.first.latitude, wayPoints.first.longitude);
     parada.thoroughfare = lugares.first.thoroughfare;
     parada.subThoroughfare = lugares.first.subThoroughfare;
 
+    for (var i = 0; i < wayPoints.length - 1; i++) {
+      wPointString += 'via:';
+      wPointString += wayPoints[i].latitude.toString();
+      wPointString += ',';
+      wPointString += wayPoints[i].longitude.toString();
+    }
     // Do busão até a parada
     var retBus = await Dio().get(
-        'https://maps.googleapis.com/maps/api/distancematrix/json' +
-            '?destinations=' +
+        'https://maps.googleapis.com/maps/api/distancematrix/json?destinations=' +
+            destino.latitude.toString() +
+            ',' +
+            destino.longitude.toString() +
+            '&origins=' +
             posBusao.latitude.toString() +
             ',' +
             posBusao.longitude.toString() +
-            '&origins=' +
-            posParada.latitude.toString() +
-            ',' +
-            posParada.longitude.toString() +
+            '&waypoints=' +
+            wPointString +
             '&key=' +
             DefaultFirebaseOptions.android.apiKey +
             '&mode=' +
@@ -924,8 +950,8 @@ class _MapViewState extends State<MapView> {
         retBus.data['rows'].first['elements'].first['duration']['text'];
     parada.distanciaAteBusao =
         retBus.data['rows'].first['elements'].first['distance']['text'];
-    parada.latitude = posParada.latitude;
-    parada.longitude = posParada.longitude;
+    parada.latitude = destino.latitude;
+    parada.longitude = destino.longitude;
     return parada;
   }
 
@@ -934,18 +960,18 @@ class _MapViewState extends State<MapView> {
     double distanciaHaversine = 0;
     LatLng? markerPosition;
     // Busca a parada mais próxima da rota atual.
-    for (var i = 0; i < rotaAtual.parada.length - 1; i++) {
+    for (var i = 0; i < rotaAtual.parada!.length - 1; i++) {
       distanciaHaversine = Haversine.haversine(
         pos.latitude,
         pos.longitude,
-        rotaAtual.parada[i].latitude,
-        rotaAtual.parada[i].longitude,
+        rotaAtual.parada![i].latitude,
+        rotaAtual.parada![i].longitude,
       );
       if (distanciaHaversine < distanciaMin) {
         distanciaMin = distanciaHaversine;
         markerPosition = LatLng(
-          rotaAtual.parada[i].latitude,
-          rotaAtual.parada[i].longitude,
+          rotaAtual.parada![i].latitude!,
+          rotaAtual.parada![i].longitude!,
         );
       }
     }
@@ -954,7 +980,7 @@ class _MapViewState extends State<MapView> {
 
   _getStremRealtimeBusao(Rota rota) {
     DatabaseReference ref =
-        FirebaseDatabase.instance.ref('localizacaoBusao/' + rota.id);
+        FirebaseDatabase.instance.ref('localizacaoBusao/' + rota.id!);
     _currentPositionStreamBusao = null;
     _currentPositionStreamBusao =
         ref.onValue.listen((DatabaseEvent event) async {
@@ -971,11 +997,28 @@ class _MapViewState extends State<MapView> {
         // A atualização do tempo/distância do busão é feita apenas a cada 6 atualizações de localização do busão.
         contadorAttDetalhes++;
         if (contadorAttDetalhes % 4 == 0) {
+          // Adiciona as paradas para calcular o tempo/distância
+          List<LatLng> paradasCaminho = [];
+          bool parAntes = true;
+          int contAntes = 0;
+          // Somente será considerados as paradas posteriores a parada atual
+          for (var element in rotaAtual.parada!) {
+            if (element.latitude == paradaAtual.latitude &&
+                element.longitude == paradaAtual.longitude) {
+              parAntes = false;
+            }
+            if (parAntes && contAntes % 3 == 0) {
+              paradasCaminho.add(LatLng(element.latitude!, element.longitude!));
+            }
+            contAntes++;
+          }
+
+          // Busca temo/distância
           Parada paradaAtualTemp;
           paradaAtualTemp = await detalhesParada(
-            rotaAtual,
-            LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
-            LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
+            destino: LatLng(paradaAtual.latitude!, paradaAtual.longitude!),
+            wayPoints: paradasCaminho,
+            posBusao: LatLng(busaoAtual.latitude!, busaoAtual.longitude!),
           );
           setState(() {
             paradaAtual = paradaAtualTemp;

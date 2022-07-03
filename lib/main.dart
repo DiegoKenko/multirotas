@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:multirotas/telas/mapa.dart' show TelaMapa;
-import 'comp/decDegrade.dart';
+import 'comp/dec_degrade.dart';
 import 'firebase_options.dart' show DefaultFirebaseOptions;
 import 'package:firebase_core/firebase_core.dart' show Firebase;
 

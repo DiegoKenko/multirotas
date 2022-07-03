@@ -1,5 +1,5 @@
 class Busao {
-  Busao(this.id, this.placa);
+  Busao();
   String? placa;
   String? id;
   double? latitude;
