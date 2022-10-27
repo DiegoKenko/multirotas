@@ -40,8 +40,6 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyBUOHpNvUgNO64PxQcSzZzd4kLLq_qjdoU',
-    appId: '1:519420295610:android:709f49230ad3fce96b4583',
     messagingSenderId: '519420295610',
     projectId: 'multirotas-b3006',
     databaseURL: 'https://multirotas-b3006-default-rtdb.firebaseio.com',
@@ -49,8 +47,6 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAONyfWeJJWQlqy2szV5mpxUl_Q5Y1hqEk',
-    appId: '1:519420295610:ios:72069afa75fd98146b4583',
     messagingSenderId: '519420295610',
     projectId: 'multirotas-b3006',
     databaseURL: 'https://multirotas-b3006-default-rtdb.firebaseio.com',
